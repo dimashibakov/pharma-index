@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="description" content="Drug Litigation Index — current and completed lawsuits, FDA notices and a transparent Litigation Signal Index per drug. Public-records aggregator; not medical or legal advice.">
+<meta name="description" content="Drug Litigation Index — search a medicine by its brand and see its lawsuits, FDA notices and a transparent Litigation Signal Index. Public-records aggregator; not medical or legal advice.">
 <meta name="robots" content="noindex">
 <title>Drug Litigation Index</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -51,29 +51,30 @@ kbd{font-family:inherit}
 const SB_URL="https://pbzkpsrmsvapyjbdatdr.supabase.co";
 const SB_KEY="sb_publishable_WdaqO2t-ee-mva7Yegl9ew_do06lVfA";
 
-/* ============ design tokens / helpers ============ */
+/* ============ tokens / helpers ============ */
 const TIER={Low:['#16794a','#e7f5ee','#bfe5cf','#4fb985'],Moderate:['#2f3fbf','#eef0fb','#cfd5f6','#6f84e6'],Elevated:['#8a5a00','#faf1de','#efd59c','#d9a23c'],High:['#b42318','#fdecea','#f6c9c5','#e5534b'],None:['#4a4b55','#f1f0f5','#dedde6','#b9b8c4']};
 const GBARS=['#4fb985','#6f84e6','#d9a23c','#e5534b'];
 const gArc=(a0,a1)=>{const P=a=>{const t=a*Math.PI/180;return (30+24*Math.cos(t)).toFixed(2)+' '+(32-24*Math.sin(t)).toFixed(2);};return 'M '+P(a0)+' A 24 24 0 0 1 '+P(a1);};
 const GSEG=[[174,140],[129,96],[84,51],[40,6]];
 const gaugeSegs=b=>{const n=['Low','Moderate','Elevated','High'].indexOf(b)+1;return GSEG.map((s,i)=>({d:gArc(s[0],s[1]),c:i<n?GBARS[i]:'#ecebf1'}));};
-const bandOf=v=>v<25?'Low':v<50?'Moderate':v<75?'Elevated':'High';
-const ST={active:'Active',winding:'Winding down',closed:'Closed',mixed:'Mixed',none:'No litigation'};
-const ACC={available:['#16794a','#e7f5ee','#bfe5cf'],limited:['#8a5a00','#faf1de','#efd59c'],paid:['#4a4b55','#f1f0f5','#dedde6']};
+const bandOf=v=>v==null?'None':v<25?'Low':v<50?'Moderate':v<75?'Elevated':'High';
+const ST={active:'Active',winding:'Winding down',closed:'Closed',mixed:'Mixed',none:'No litigation',excluded:'Excluded'};
+const ACC={available:['#16794a','#e7f5ee','#bfe5cf'],limited:['#8a5a00','#faf1de','#efd59c'],paid:['#4a4b55','#f1f0f5','#dedde6'],unavailable:['#b42318','#fdecea','#f6c9c5']};
+const SCOPE={brand:['#8a5a00','#faf1de','#efd59c'],ingredient:['#2f3fbf','#eef0fb','#cfd5f6'],molecule:['#2f3fbf','#eef0fb','#cfd5f6'],class:['#16794a','#e7f5ee','#bfe5cf']};
 const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const slugify=s=>String(s||'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
 const PANEL="border:1px solid rgba(17,17,20,.08);border-radius:16px;padding:24px;background:#fff";
 const H3="margin:0 0 11px;font-size:18px;font-weight:500;letter-spacing:-0.01em;color:#111114";
 const CHIP="font-size:13px;border:1px solid rgba(17,17,20,.12);background:#fff;border-radius:999px;padding:6px 13px;white-space:nowrap;color:#33353c;cursor:pointer";
+const scopeBadge=s=>{const c=SCOPE[s]||SCOPE.molecule;const lbl=s==='molecule'?'molecule':s;return `<span style="font-size:10.5px;font-weight:500;border-radius:6px;padding:2px 7px;letter-spacing:.02em;text-transform:uppercase;white-space:nowrap;background:${c[1]};border:1px solid ${c[2]};color:${c[0]}">${esc(lbl)}</span>`;};
 
 function gauge(bd,ix,w,h,num){const segs=gaugeSegs(bd).map(s=>`<path d="${s.d}" stroke="${s.c}" stroke-width="${num>40?5:6}" stroke-linecap="round"></path>`).join("");
- return `<span style="position:relative;display:block;width:${w}px;height:${h}px;flex:none"><svg width="${w}" height="${h}" viewBox="0 0 60 36" fill="none" style="position:absolute;inset:0">${segs}</svg><span style="position:absolute;left:0;right:0;bottom:0;text-align:center;font-size:${num}px;font-weight:500;letter-spacing:-0.02em;line-height:1;font-variant-numeric:tabular-nums;color:#111114">${ix}</span></span>`;}
-function drugCard(d){return `<a href="#drug-${d.s}" style="display:block;border:1px solid rgba(17,17,20,.08);border-radius:16px;padding:18px 20px;background:#fff;color:inherit">
-  <div style="font-size:16px;font-weight:500;letter-spacing:-0.01em">${esc(d.br)}</div>
-  <div style="font-size:11.5px;color:#8a8a93;margin-top:2px">${esc(d.ty)} · ${esc(d.mf)}</div>
-  <div style="display:flex;flex-direction:column;align-items:flex-start;gap:4px;margin-top:14px">${gauge(d.bd,d.ix,72,44,19)}<span style="font-size:12.5px;color:${TIER[d.bd][0]};width:72px;text-align:center">${d.bd}</span></div></a>`;}
+ return `<span style="position:relative;display:block;width:${w}px;height:${h}px;flex:none"><svg width="${w}" height="${h}" viewBox="0 0 60 36" fill="none" style="position:absolute;inset:0">${segs}</svg><span style="position:absolute;left:0;right:0;bottom:0;text-align:center;font-size:${num}px;font-weight:500;letter-spacing:-0.02em;line-height:1;font-variant-numeric:tabular-nums;color:#111114">${ix==null?'—':ix}</span></span>`;}
+function prodCard(p){return `<a href="#product-${p.s}" style="display:block;border:1px solid rgba(17,17,20,.08);border-radius:16px;padding:18px 20px;background:#fff;color:inherit">
+  <div style="font-size:16px;font-weight:500;letter-spacing:-0.01em">${esc(p.br)}</div>
+  <div style="font-size:11.5px;color:#8a8a93;margin-top:2px">${esc(p.ing.inn)} · ${esc(p.mf||'—')}</div>
+  <div style="display:flex;flex-direction:column;align-items:flex-start;gap:4px;margin-top:14px">${gauge(p.bd,p.ix,72,44,19)}<span style="font-size:12.5px;color:${TIER[p.bd]?TIER[p.bd][0]:'#6b6d75'};width:72px;text-align:center">${p.bd}</span></div></a>`;}
 
-/* images: resolved client-side from a Wikipedia article title (no stored URLs) */
 const imgCache={};
 function hydrateImages(){
  document.querySelectorAll('[data-wiki]').forEach(el=>{
@@ -81,209 +82,236 @@ function hydrateImages(){
   const t=el.getAttribute('data-wiki'); if(!t)return;
   const set=u=>{if(u){el.style.backgroundImage='url("'+u+'")';el.style.backgroundSize='contain';el.style.backgroundRepeat='no-repeat';el.style.backgroundPosition='center';el.textContent='';}};
   if(imgCache[t]!==undefined){set(imgCache[t]);return;}
-  fetch('https://en.wikipedia.org/api/rest_v1/page/summary/'+encodeURIComponent(t))
-   .then(r=>r.ok?r.json():null)
-   .then(j=>{const u=j&&j.thumbnail&&j.thumbnail.source;imgCache[t]=u||null;set(u);})
-   .catch(()=>{imgCache[t]=null;});
+  fetch('https://en.wikipedia.org/api/rest_v1/page/summary/'+encodeURIComponent(t)).then(r=>r.ok?r.json():null).then(j=>{const u=j&&j.thumbnail&&j.thumbnail.source;imgCache[t]=u||null;set(u);}).catch(()=>{imgCache[t]=null;});
  });
 }
-/* company logo via Clearbit by domain, with a monogram fallback */
 function logoHTML(domain,name,size){const s=size||40;
  const mono=(name||'?').replace(/[^A-Za-z0-9 ]/g,'').split(/\s+/).filter(Boolean).slice(0,2).map(w=>w[0]).join('').toUpperCase();
  const monoStyle=`width:${s}px;height:${s}px;border-radius:9px;background:#eef0fb;color:#3b63b8;place-items:center;font-size:${Math.round(s*0.36)}px;font-weight:600;flex:none`;
  const monoSpan=`<span style="${monoStyle};display:${domain?'none':'grid'}">${mono}</span>`;
  const img=domain?`<img src="https://logo.clearbit.com/${esc(domain)}" alt="${esc(name)}" style="width:${s}px;height:${s}px;border-radius:9px;object-fit:contain;background:#fff;border:1px solid rgba(17,17,20,.08);flex:none" onerror="this.style.display='none';this.nextElementSibling.style.display='grid'">`:'';
- return `<span style="display:inline-flex;flex:none">${img}${monoSpan}</span>`;
-}
+ return `<span style="display:inline-flex;flex:none">${img}${monoSpan}</span>`;}
 
 /* ============ data load + assembly ============ */
-let DRUGS=[], MANS={}, MDLS={}, SOURCES=[], DBYID={};
+let PRODUCTS=[], ING={}, CLS={}, MAN={}, SOURCES=[], PBYSLUG={}, prodByIng={}, prodByClass={};
 async function loadData(){
  const H={apikey:SB_KEY,Authorization:'Bearer '+SB_KEY};
  const get=t=>fetch(SB_URL+'/rest/v1/'+t,{headers:H}).then(r=>{if(!r.ok)throw new Error(t.split('?')[0]+' '+r.status);return r.json();});
- const [drugs,comps,lits,mans,dm,ld,srcs,mkt,hist]=await Promise.all([
-  get('drugs?select=id,slug,name,brands,drug_type,manufacturer,manufacturer_primary,status,signal_index,band,confidence,fda_summary,boxed_warning,description,image_url,wiki_title&order=signal_index.desc'),
-  get('signal_components?select=drug_id,position,name,weight,score,value,is_estimated&order=drug_id,position'),
-  get('litigation?select=id,drug_id,docket,court,injuries,pending,status,is_excluded&order=id'),
-  get('manufacturers?select=id,slug,name,status,org_type,note,description,website,hq,founded,logo_url'),
-  get('drug_manufacturers?select=drug_id,manufacturer_id,role,valid_from,valid_to'),
-  get('litigation_defendants?select=litigation_id,manufacturer_id,defendant_name,note'),
-  get('data_sources?select=name,category,access,notes,coverage'),
-  get('drug_market_names?select=drug_id,country,brand_name,note&order=id'),
-  get('risk_scores?select=drug_id,version,signal_index,band,created_at&order=drug_id,version')
+ const [prods,ings,classes,mans,comps,cases,cdefs,scores,srcs]=await Promise.all([
+  get('products?select=id,slug,brand_name,ingredient_id,manufacturer_id,indication,form,region,status,signal_index,band,confidence,description&order=signal_index.desc.nullslast'),
+  get('ingredients?select=id,slug,inn_name,class_id,description,wiki_title,boxed_warning,fda_summary,ae_value'),
+  get('drug_classes?select=id,slug,name,summary'),
+  get('manufacturers?select=id,slug,name,description,website,hq,founded'),
+  get('product_components?select=product_id,position,name,weight,score,value,scope,is_estimated&order=product_id,position'),
+  get('cases?select=id,scope,class_id,ingredient_id,product_id,docket,court,injuries,pending,status,is_excluded,note&order=id'),
+  get('case_defendants?select=case_id,manufacturer_id,defendant_name'),
+  get('product_scores?select=product_id,version,signal_index,band,created_at&order=product_id,version'),
+  get('data_sources?select=name,category,access,notes,coverage')
  ]);
- const manById=Object.fromEntries(mans.map(m=>[m.id,m]));
- const manBySlug=Object.fromEntries(mans.map(m=>[m.slug,m]));
  const by=(arr,k)=>{const o={};arr.forEach(x=>(o[x[k]]=o[x[k]]||[]).push(x));return o;};
- const compBy=by(comps,'drug_id'), litBy=by(lits,'drug_id'), dmBy=by(dm,'drug_id'), ldBy=by(ld,'litigation_id'), mktBy=by(mkt,'drug_id'), histBy=by(hist,'drug_id');
- DRUGS=drugs.map(r=>{
+ mans.forEach(m=>MAN[m.id]={id:m.id,slug:m.slug,name:m.name,desc:m.description,site:m.website,hq:m.hq,founded:m.founded});
+ classes.forEach(c=>CLS[c.id]={id:c.id,slug:c.slug,name:c.name,summary:c.summary,ings:[],prods:[]});
+ ings.forEach(g=>{ING[g.id]={id:g.id,slug:g.slug,inn:g.inn_name,class_id:g.class_id,desc:g.description,wiki:g.wiki_title,boxed:g.boxed_warning,fda:g.fda_summary,ae_value:g.ae_value,prods:[]};
+   if(CLS[g.class_id])CLS[g.class_id].ings.push(ING[g.id]);});
+ const compBy=by(comps,'product_id'), scoreBy=by(scores,'product_id');
+ const cdBy=by(cdefs,'case_id');
+ cases.forEach(c=>{c._defs=(cdBy[c.id]||[]).map(d=>d.manufacturer_id?(MAN[d.manufacturer_id]||{}).name:d.defendant_name).filter(Boolean);});
+ PRODUCTS=prods.map(r=>{
+   const g=ING[r.ingredient_id]||{inn:'—',prods:[]};
+   const cl=CLS[g.class_id]||null;
+   const man=MAN[r.manufacturer_id];
    const cs=(compBy[r.id]||[]).slice().sort((a,b)=>a.position-b.position);
-   const g=(i,f)=>cs[i]?cs[i][f]:null;
-   const cp=[g(0,'score'),g(0,'value')||'',g(1,'score'),g(1,'value')||'',g(2,'score'),g(2,'value')||'',cs[2]&&cs[2].is_estimated?1:0,g(3,'score'),g(3,'value')||''];
-   const myl=(litBy[r.id]||[]); const prim=myl.find(l=>!l.is_excluded)||myl[0]||{};
-   const mdl={d:prim.docket||'no MDL',id:((prim.docket||'').match(/\d{3,4}/)||[''])[0],court:prim.court||'—',st:prim.status||r.status,inj:prim.injuries||'—',pend:prim.pending||'—'};
-   const dms=(dmBy[r.id]||[]); const cur=dms.find(x=>x.role==='current_manufacturer');
-   const curMan=cur?manById[cur.manufacturer_id]:null;
-   const mf=curMan?curMan.name:(r.manufacturer_primary||r.manufacturer||'—');
-   const mfs=curMan?curMan.slug:slugify(mf);
-   const former=dms.filter(x=>x.role==='former_manufacturer'||x.role==='originator').map(x=>({name:(manById[x.manufacturer_id]||{}).name||'—',to:x.valid_to}));
-   const defs=[]; myl.forEach(l=>(ldBy[l.id]||[]).forEach(x=>{const nm=x.manufacturer_id?(manById[x.manufacturer_id]||{}).name:x.defendant_name;if(nm&&!defs.includes(nm))defs.push(nm);}));
-   return {id:r.id,s:r.slug,nm:r.name,br:r.brands,ty:r.drug_type,mf,mfs,ix:r.signal_index,bd:r.band,st:r.status,conf:r.confidence,fda:r.fda_summary,boxed:r.boxed_warning,cp,mdl,former,defs,curType:curMan?curMan.org_type:null,curNote:curMan?curMan.note:null,desc:r.description,wiki:r.wiki_title,img:r.image_url,mkt:(mktBy[r.id]||[]),hist:(histBy[r.id]||[])};
+   const myCases=cases.filter(c=>!c.is_excluded && (c.product_id===r.id || c.ingredient_id===r.ingredient_id || (cl&&c.class_id===cl.id)));
+   const hist=(scoreBy[r.id]||[]).slice().sort((a,b)=>a.version-b.version);
+   const p={id:r.id,s:r.slug,br:r.brand_name,ing:g,cls:cl,mf:man?man.name:null,mfs:man?man.slug:null,ind:r.indication,form:r.form,region:r.region,
+     ix:r.signal_index,bd:r.band||bandOf(r.signal_index),conf:r.confidence,desc:r.description,comps:cs,cases:myCases,hist:hist,status:r.status};
+   return p;
  });
- DBYID=Object.fromEntries(DRUGS.map(d=>[d.id,d]));
- MANS={}; DRUGS.forEach(d=>{(MANS[d.mfs]=MANS[d.mfs]||{slug:d.mfs,name:d.mf,drugs:[]}).drugs.push(d);});
- Object.values(MANS).forEach(m=>{m.avg=Math.round(m.drugs.reduce((a,d)=>a+d.ix,0)/m.drugs.length);const meta=manBySlug[m.slug]||{};m.desc=meta.description;m.site=meta.website;m.hq=meta.hq;m.founded=meta.founded;m.logo=meta.logo_url;});
- MDLS={}; lits.forEach(l=>{const id=((l.docket||'').match(/\d{3,4}/)||[''])[0]; if(id&&!l.is_excluded){const M=MDLS[id]=MDLS[id]||{id,docket:l.docket,court:l.court,inj:l.injuries,st:l.status,pend:l.pending,drugs:[]}; const dd=DBYID[l.drug_id]; if(dd&&!M.drugs.includes(dd))M.drugs.push(dd);}});
+ PRODUCTS.forEach(p=>{PBYSLUG[p.s]=p;(prodByIng[p.ing.id]=prodByIng[p.ing.id]||[]).push(p);if(p.cls)(prodByClass[p.cls.id]=prodByClass[p.cls.id]||[]).push(p);if(p.ing.prods)p.ing.prods.push(p);if(p.cls)p.cls.prods.push(p);});
  SOURCES=srcs.map(x=>({s:slugify(x.name),nm:x.name,cat:x.category,acc:x.access,note:x.notes||x.coverage||''}));
 }
-const bySlug=s=>DRUGS.find(d=>d.s===s);
+const bySlug=s=>PBYSLUG[s];
+const ingBySlug=s=>Object.values(ING).find(g=>g.slug===s);
+const clsBySlug=s=>Object.values(CLS).find(c=>c.slug===s);
+const manBySlug=s=>Object.values(MAN).find(m=>m.slug===s);
 const srcBySlug=s=>SOURCES.find(x=>x.s===s);
+
+/* ============ shared bits ============ */
+function caseRows(cases){
+ if(!cases.length)return '<p style="font-size:13px;color:#6b6d75;margin:0">No litigation on record.</p>';
+ return cases.map(c=>`<div style="display:flex;gap:12px;padding:11px 0;border-top:1px solid rgba(17,17,20,.08);font-size:13.5px">
+   <span style="flex:0 0 118px;color:#6b6d75;font-size:12.5px">${esc(c.docket||'—')}<div style="margin-top:5px">${scopeBadge(c.scope)}</div></span>
+   <span style="flex:1;min-width:0"><b>${esc(c.injuries||'—')}</b>${c.court&&c.court!=='—'?' · '+esc(c.court):''}${c.status?' · '+esc(ST[c.status]||c.status):''}${c.pending&&c.pending!=='—'?' · pending '+esc(c.pending):''}
+   ${c._defs&&c._defs.length?`<div style="color:#6b6d75;font-size:12.5px;margin-top:3px">Defendants: ${esc(c._defs.join(' + '))}</div>`:''}
+   ${c.note?`<div style="color:#8a8a93;font-size:12px;margin-top:3px">${esc(c.note)}</div>`:''}</span></div>`).join("");
+}
 
 /* ============ pages ============ */
 function pHome(){
- const top=[...DRUGS].sort((a,b)=>b.ix-a.ix).slice(0,6);
- const types=[...new Set(DRUGS.map(d=>d.ty))];
- const popular=['semaglutide','ranitidine','acetaminophen','oxycodone'].map(bySlug).filter(Boolean);
+ const top=PRODUCTS.filter(p=>p.ix!=null).slice(0,6);
+ const popular=['ozempic','zantac','tylenol','oxycontin'].map(bySlug).filter(Boolean);
+ const classes=Object.values(CLS).filter(c=>c.prods.length).sort((a,b)=>a.name.localeCompare(b.name));
  const legend=[['Low','#4fb985'],['Moderate','#6f84e6'],['Elevated','#d9a23c'],['High','#e5534b']];
  return `<div style="display:flex;flex-direction:column">
-  <div style="position:relative;overflow:hidden;border-radius:32px;margin:calc(-1 * clamp(24px,4vw,48px)) calc(-1 * clamp(24px,4vw,48px)) 0;min-height:clamp(440px,42vw,560px);display:flex;align-items:center;background:#e6e7ec">
+  <div style="position:relative;overflow:hidden;border-radius:32px;margin:calc(-1 * clamp(24px,4vw,48px)) calc(-1 * clamp(24px,4vw,48px)) 0;min-height:clamp(430px,40vw,540px);display:flex;align-items:center;background:#e6e7ec">
    <div style="position:relative;width:100%;padding:clamp(24px,4vw,48px);container-type:inline-size">
-    <h1 style="font-size:min(92px,7cqi);line-height:1;font-weight:500;letter-spacing:-0.04em;margin:0 0 32px"><span style="display:block">What's known about a drug's</span><span style="display:block">litigation history</span></h1>
+    <h1 style="font-size:min(88px,7cqi);line-height:1;font-weight:500;letter-spacing:-0.04em;margin:0 0 30px"><span style="display:block">Look up your medicine's</span><span style="display:block">litigation history</span></h1>
     <div id="heroSearch" style="display:flex;align-items:center;gap:14px;width:100%;background:#fff;border:2px solid #fff;border-radius:22px;padding:10px 10px 10px 26px;cursor:text;box-shadow:0 28px 60px -24px rgba(59,99,184,.45),0 2px 6px rgba(17,17,20,.06)">
      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#3b63b8" stroke-width="2.2" style="flex:none"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.5-3.5"></path></svg>
-     <input readonly placeholder="Search a drug, manufacturer or MDL — e.g. Ozempic" style="flex:1;min-width:0;border:0;outline:none;background:transparent;font-family:inherit;font-size:clamp(17px,1.6vw,20px);color:#111114;padding:14px 0;cursor:text">
+     <input readonly placeholder="Search by brand — e.g. Ozempic, Tylenol, Zantac" style="flex:1;min-width:0;border:0;outline:none;background:transparent;font-family:inherit;font-size:clamp(17px,1.6vw,20px);color:#111114;padding:14px 0;cursor:text">
      <span style="flex:none;display:inline-flex;align-items:center;gap:10px;font-size:16px;font-weight:500;padding:16px 28px;border-radius:14px;background:#3b63b8;color:#fff">Search<kbd style="font-size:12px;border:1px solid rgba(255,255,255,.4);border-radius:6px;padding:0 6px;color:#fff">⌘K</kbd></span>
     </div>
     <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:16px;font-size:13.5px;color:#33353c">
      <span style="color:#6b6d75">Popular:</span>
-     ${popular.map(d=>`<a href="#drug-${d.s}" style="padding:6px 13px;border-radius:999px;background:rgba(255,255,255,.85);border:1px solid rgba(17,17,20,.08);white-space:nowrap;color:inherit">${esc(d.br.split(' /')[0])}</a>`).join("")}
+     ${popular.map(p=>`<a href="#product-${p.s}" style="padding:6px 13px;border-radius:999px;background:rgba(255,255,255,.85);border:1px solid rgba(17,17,20,.08);white-space:nowrap;color:inherit">${esc(p.br)}</a>`).join("")}
     </div>
-    <p style="color:#6b6d75;font-size:14px;line-height:1.5;margin:24px 0 0;max-width:60ch">Search any drug: current and completed lawsuits, FDA regulatory notices, and a transparent Litigation Signal Index. A public-records aggregator — not medical or legal advice.</p>
+    <p style="color:#6b6d75;font-size:14px;line-height:1.5;margin:22px 0 0;max-width:60ch">Search the brand your doctor wrote. See its active ingredient, maker, lawsuits and FDA notices, and a transparent Litigation Signal Index. A public-records aggregator — not medical or legal advice.</p>
    </div>
   </div>
   <div style="display:flex;justify-content:center;gap:14px;flex-wrap:wrap;margin-top:24px;font-size:12px;color:#6b6d75">
    ${legend.map(l=>`<span style="display:inline-flex;align-items:center;gap:6px"><span style="width:8px;height:8px;border-radius:50%;background:${l[1]}"></span>${l[0]}</span>`).join("")}
   </div>
   <div style="margin-top:22px"><div style="font-size:13px;color:#8a8a93;margin-bottom:8px">Highest signal</div>
-   <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(168px,1fr));gap:11px">${top.map(drugCard).join("")}</div></div>
-  <div style="margin-top:20px"><div style="font-size:13px;color:#8a8a93;margin-bottom:8px">Browse by type</div>
-   <div style="display:flex;gap:7px;flex-wrap:wrap">${types.map(t=>`<span data-act="type:${esc(t)}" style="${CHIP}">${esc(t)}</span>`).join("")}</div></div>
-  <div style="background:#faf1de;border:1px solid #efd59c;border-radius:16px;padding:14px 16px;margin-top:20px"><p style="margin:0;font-size:12.5px;color:#8a5a00"><b>Note:</b> the index reflects legal and reporting activity, not proven clinical danger. High means “worth attention,” not “unsafe”; low is not a safety guarantee.</p></div>
+   <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(168px,1fr));gap:11px">${top.map(prodCard).join("")}</div></div>
+  <div style="margin-top:20px"><div style="font-size:13px;color:#8a8a93;margin-bottom:8px">Browse by class</div>
+   <div style="display:flex;gap:7px;flex-wrap:wrap">${classes.map(c=>`<a href="#class-${c.slug}" style="${CHIP}">${esc(c.name)} <span style="color:#8a8a93">${c.prods.length}</span></a>`).join("")}</div></div>
+  <div style="background:#faf1de;border:1px solid #efd59c;border-radius:16px;padding:14px 16px;margin-top:20px"><p style="margin:0;font-size:12.5px;color:#8a5a00"><b>Note:</b> the index reflects legal and reporting activity, not proven clinical danger. It is calculated per active ingredient, so brands of the same drug share a score. High means “worth attention,” not “unsafe.”</p></div>
  </div>`;
 }
 
-let FILTERS={ty:[],mf:[],bd:[],st:[]};
+let FILTERS={cls:[],mf:[],bd:[]};
 function pBrowse(){
- const cnt=(k,val)=>DRUGS.filter(d=>d[k]===val).length;
- const types=[...new Set(DRUGS.map(d=>d.ty))], mfs=[...new Set(DRUGS.map(d=>d.mf))];
- const grp=(title,k,vals,lab)=>`<div><div style="font-size:13px;color:#8a8a93;margin-bottom:8px">${title}</div>${vals.map(val=>{const on=FILTERS[k].includes(val);return `<div data-act="facet:${k}:${esc(val)}" style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:${on?'#111114':'#6b6d75'};padding:3px 0;cursor:pointer;user-select:none"><span style="width:13px;height:13px;border:1px solid ${on?'#3b63b8':'rgba(17,17,20,.12)'};background:${on?'#3b63b8':'#fff'};border-radius:3px;flex:none"></span>${esc(lab?lab[val]:val)}<span style="margin-left:auto;font-size:11px;color:#8a8a93;font-family:ui-monospace,monospace">${cnt(k,val)}</span></div>`;}).join("")}</div>`;
- const side=`<div style="flex:0 0 210px;max-width:100%;display:flex;flex-direction:column;gap:15px">${grp('Drug type','ty',types)}${grp('Manufacturer','mf',mfs)}${grp('Band','bd',['Low','Moderate','Elevated','High'])}${grp('Status','st',['active','winding','closed','none'],ST)}</div>`;
+ const classes=[...new Set(PRODUCTS.map(p=>p.cls?p.cls.name:'—'))];
+ const mfs=[...new Set(PRODUCTS.map(p=>p.mf).filter(Boolean))];
+ const cnt=(k,val)=>PRODUCTS.filter(p=>keyOf(p,k)===val).length;
+ const keyOf=(p,k)=>k==='cls'?(p.cls?p.cls.name:'—'):k==='mf'?p.mf:p.bd;
+ const grp=(title,k,vals)=>`<div><div style="font-size:13px;color:#8a8a93;margin-bottom:8px">${title}</div>${vals.map(val=>{const on=FILTERS[k].includes(val);return `<div data-act="facet:${k}:${esc(val)}" style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:${on?'#111114':'#6b6d75'};padding:3px 0;cursor:pointer;user-select:none"><span style="width:13px;height:13px;border:1px solid ${on?'#3b63b8':'rgba(17,17,20,.12)'};background:${on?'#3b63b8':'#fff'};border-radius:3px;flex:none"></span>${esc(val)}<span style="margin-left:auto;font-size:11px;color:#8a8a93;font-family:ui-monospace,monospace">${cnt(k,val)}</span></div>`;}).join("")}</div>`;
+ const side=`<div style="flex:0 0 220px;max-width:100%;display:flex;flex-direction:column;gap:15px">${grp('Drug class','cls',classes)}${grp('Manufacturer','mf',mfs)}${grp('Band','bd',['Low','Moderate','Elevated','High'])}</div>`;
  const has=Object.values(FILTERS).some(a=>a.length);
- const list=DRUGS.filter(d=>['ty','mf','bd','st'].every(k=>!FILTERS[k].length||FILTERS[k].includes(d[k]))).sort((a,b)=>b.ix-a.ix);
- const main=`<div style="flex:1 1 420px;min-width:0"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:11px;min-height:28px"><div style="font-size:13px;color:#8a8a93">${list.length} drugs${has?' · filtered':''}</div>${has?'<span data-act="clearf" style="'+CHIP+'">Clear filters</span>':''}</div><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:11px">${list.map(drugCard).join("")}</div>${list.length?'':'<div style="color:#6b6d75;font-size:13px">Nothing matches the filter.</div>'}</div>`;
+ const list=PRODUCTS.filter(p=>(!FILTERS.cls.length||FILTERS.cls.includes(p.cls?p.cls.name:'—'))&&(!FILTERS.mf.length||FILTERS.mf.includes(p.mf))&&(!FILTERS.bd.length||FILTERS.bd.includes(p.bd)));
+ const main=`<div style="flex:1 1 420px;min-width:0"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:11px;min-height:28px"><div style="font-size:13px;color:#8a8a93">${list.length} products${has?' · filtered':''}</div>${has?'<span data-act="clearf" style="'+CHIP+'">Clear filters</span>':''}</div><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:11px">${list.map(prodCard).join("")}</div>${list.length?'':'<div style="color:#6b6d75;font-size:13px">Nothing matches the filter.</div>'}</div>`;
  return `<div style="display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start">${side}${main}</div>`;
 }
 
 let SORT={k:'ix',d:-1};
 function pExplore(){
- const heads=[['br','Drug'],['ty','Type'],['mf','Manufacturer'],['ix','Index'],['bd','Band'],['st','Status']];
- const rows=[...DRUGS].sort((a,b)=>{const x=a[SORT.k],y=b[SORT.k];return (x<y?-1:x>y?1:0)*SORT.d;});
- const th=heads.map(([k,l])=>`<th data-act="sort:${k}" style="text-align:left;padding:14px 20px;border-bottom:1px solid rgba(17,17,20,.06);background:#fafafb;color:${SORT.k===k?'#111114':'#6b6d75'};font-weight:500;font-size:12.5px;cursor:pointer;white-space:nowrap;user-select:none">${l} <span style="color:#8a8a93">${SORT.k===k?(SORT.d<0?'↓':'↑'):'↕'}</span></th>`).join("");
- const tb=rows.map(d=>`<tr data-nav="drug-${d.s}" style="cursor:pointer">
-   <td style="padding:14px 20px;border-bottom:1px solid rgba(17,17,20,.06)">${esc(d.br)}<div style="font-size:10.5px;color:#8a8a93">${esc(d.nm)}</div></td>
-   <td style="padding:14px 20px;border-bottom:1px solid rgba(17,17,20,.06);color:#33353c">${esc(d.ty)}</td>
-   <td style="padding:14px 20px;border-bottom:1px solid rgba(17,17,20,.06);color:#33353c">${esc(d.mf)}</td>
-   <td style="padding:10px 20px;border-bottom:1px solid rgba(17,17,20,.06)">${gauge(d.bd,d.ix,52,32,14)}</td>
-   <td style="padding:14px 20px;border-bottom:1px solid rgba(17,17,20,.06)"><span style="font-size:13.5px;color:${TIER[d.bd][0]};white-space:nowrap">${d.bd}</span></td>
-   <td style="padding:14px 20px;border-bottom:1px solid rgba(17,17,20,.06);color:#6b6d75;white-space:nowrap">${esc(ST[d.st]||d.st)}</td></tr>`).join("");
- const agg={};DRUGS.forEach(d=>(agg[d.mf]=agg[d.mf]||[]).push(d.ix));
+ const val=(p,k)=>k==='br'?p.br:k==='ing'?p.ing.inn:k==='cls'?(p.cls?p.cls.name:''):k==='mf'?(p.mf||''):k==='bd'?p.bd:(p.ix==null?-1:p.ix);
+ const heads=[['br','Brand'],['ing','Ingredient'],['cls','Class'],['mf','Manufacturer'],['ix','Index'],['bd','Band']];
+ const rows=[...PRODUCTS].sort((a,b)=>{const x=val(a,SORT.k),y=val(b,SORT.k);return (x<y?-1:x>y?1:0)*SORT.d;});
+ const th=heads.map(([k,l])=>`<th data-act="sort:${k}" style="text-align:left;padding:13px 18px;border-bottom:1px solid rgba(17,17,20,.06);background:#fafafb;color:${SORT.k===k?'#111114':'#6b6d75'};font-weight:500;font-size:12.5px;cursor:pointer;white-space:nowrap">${l} <span style="color:#8a8a93">${SORT.k===k?(SORT.d<0?'↓':'↑'):'↕'}</span></th>`).join("");
+ const tb=rows.map(p=>`<tr data-nav="product-${p.s}" style="cursor:pointer">
+   <td style="padding:13px 18px;border-bottom:1px solid rgba(17,17,20,.06)">${esc(p.br)}</td>
+   <td style="padding:13px 18px;border-bottom:1px solid rgba(17,17,20,.06);color:#33353c">${esc(p.ing.inn)}</td>
+   <td style="padding:13px 18px;border-bottom:1px solid rgba(17,17,20,.06);color:#6b6d75">${esc(p.cls?p.cls.name:'—')}</td>
+   <td style="padding:13px 18px;border-bottom:1px solid rgba(17,17,20,.06);color:#33353c">${esc(p.mf||'—')}</td>
+   <td style="padding:9px 18px;border-bottom:1px solid rgba(17,17,20,.06)">${gauge(p.bd,p.ix,52,32,14)}</td>
+   <td style="padding:13px 18px;border-bottom:1px solid rgba(17,17,20,.06)"><span style="font-size:13.5px;color:${TIER[p.bd]?TIER[p.bd][0]:'#6b6d75'}">${p.bd}</span></td></tr>`).join("");
+ const agg={};PRODUCTS.forEach(p=>{if(p.ix!=null){const k=p.cls?p.cls.name:'—';(agg[k]=agg[k]||[]).push(p.ix);}});
  const bars=Object.entries(agg).map(([m,a])=>[m,Math.round(a.reduce((t,x)=>t+x,0)/a.length)]).sort((a,b)=>b[1]-a[1]);
- const barsHTML=bars.map(([m,val])=>{const d=DRUGS.find(x=>x.mf===m);return `<div data-nav="mfr-${d?d.mfs:slugify(m)}" style="display:grid;grid-template-columns:minmax(90px,150px) minmax(0,1fr) 34px;gap:10px;align-items:center;margin:8px 0;font-size:12.5px;cursor:pointer"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(m)}</span><span style="display:block;height:12px;background:#ecebf1;border-radius:3px;overflow:hidden"><span style="display:block;height:100%;width:${val}%;background:${TIER[bandOf(val)][3]};border-radius:3px;opacity:.75"></span></span><span style="text-align:right;color:#6b6d75">${val}</span></div>`;}).join("");
- return `<div style="font-size:13px;color:#8a8a93;margin-bottom:8px">Explorer</div><h1 style="font-size:clamp(30px,3.6vw,44px);line-height:1.05;font-weight:500;margin:0 0 28px;letter-spacing:-0.03em">Full cohort — sort and slice</h1>
-  <div style="overflow-x:auto;border:1px solid rgba(17,17,20,.08);border-radius:16px;background:#fff"><table style="border-collapse:collapse;width:100%;min-width:640px;font-size:13px"><thead><tr>${th}</tr></thead><tbody>${tb}</tbody></table></div>
-  <div style="${PANEL};margin-top:14px"><div style="font-size:13px;color:#8a8a93;margin-bottom:8px">Average index by manufacturer</div>${barsHTML}</div>`;
+ const barsHTML=bars.map(([m,v])=>`<div style="display:grid;grid-template-columns:minmax(120px,210px) minmax(0,1fr) 34px;gap:10px;align-items:center;margin:8px 0;font-size:12.5px"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(m)}</span><span style="display:block;height:12px;background:#ecebf1;border-radius:3px;overflow:hidden"><span style="display:block;height:100%;width:${v}%;background:${TIER[bandOf(v)][3]};border-radius:3px;opacity:.75"></span></span><span style="text-align:right;color:#6b6d75">${v}</span></div>`).join("");
+ return `<div style="font-size:13px;color:#8a8a93;margin-bottom:8px">Explorer</div><h1 style="font-size:clamp(30px,3.6vw,44px);line-height:1.05;font-weight:500;margin:0 0 28px;letter-spacing:-0.03em">Every product — sort and slice</h1>
+  <div style="overflow-x:auto;border:1px solid rgba(17,17,20,.08);border-radius:16px;background:#fff"><table style="border-collapse:collapse;width:100%;min-width:680px;font-size:13px"><thead><tr>${th}</tr></thead><tbody>${tb}</tbody></table></div>
+  <div style="${PANEL};margin-top:14px"><div style="font-size:13px;color:#8a8a93;margin-bottom:8px">Average index by class</div>${barsHTML}</div>`;
 }
 
-function pDrug(slug){
- const d=bySlug(slug); if(!d)return `<div style="${PANEL}">Not found. <a href="#browse" style="color:#3b63b8">← back to browse</a></div>`;
- const names=['Regulatory action','Litigation volume','AE severity','Court outcomes'],w=['30%','25%','25%','20%'];
- const parts=[[d.cp[0],d.cp[1],false],[d.cp[2],d.cp[3],false],[d.cp[4],d.cp[5],d.cp[6]===1],[d.cp[7],d.cp[8],false]];
- const comps=parts.map((pt,i)=>{const pend=pt[0]===null||pt[0]===undefined;const fill=pend?'repeating-linear-gradient(45deg,#b9b8c4,#b9b8c4 5px,transparent 5px,transparent 10px)':TIER[bandOf(pt[0])][3];
-   return `<div style="margin-bottom:11px"><div style="display:flex;justify-content:space-between;gap:10px;font-size:13px;margin-bottom:4px;flex-wrap:wrap"><span>${names[i]} <span style="color:#8a8a93;font-size:11px">· ${w[i]}</span></span><span style="color:#6b6d75;font-size:12px">${esc(pt[1])}${pt[2]?'<span style="font-size:11px;color:#8a5a00;background:#faf1de;border:1px solid #efd59c;border-radius:4px;padding:1px 6px;margin-left:5px;vertical-align:middle">EST</span>':''} · ${pend?'—':pt[0]}</span></div><div style="height:7px;background:#ecebf1;border-radius:99px;overflow:hidden"><div style="height:100%;width:${pend?'100%':pt[0]+'%'};background:${fill};border-radius:99px"></div></div></div>`;}).join("");
- const hv=(d.hist||[]).slice().sort((a,b)=>a.version-b.version); const hmax=Math.max(...hv.map(h=>h.signal_index),1);
+function pProduct(slug){
+ const p=bySlug(slug); if(!p)return `<div style="${PANEL}">Not found. <a href="#browse" style="color:#3b63b8">← back to browse</a></div>`;
+ const g=p.ing, cl=p.cls;
+ const names={1:'Regulatory action',2:'Litigation volume',3:'AE severity',4:'Court outcomes'};
+ const comps=p.comps.map(c=>{const pend=c.score==null;const fill=pend?'repeating-linear-gradient(45deg,#b9b8c4,#b9b8c4 5px,transparent 5px,transparent 10px)':TIER[bandOf(c.score)][3];const wp=Math.round(Number(c.weight)*100);
+   return `<div style="margin-bottom:12px"><div style="display:flex;justify-content:space-between;gap:10px;font-size:13px;margin-bottom:4px;flex-wrap:wrap"><span>${esc(c.name)} <span style="color:#8a8a93;font-size:11px">· ${wp}%</span> ${scopeBadge(c.scope)}${c.is_estimated?' <span style="font-size:10.5px;color:#8a5a00;background:#faf1de;border:1px solid #efd59c;border-radius:5px;padding:1px 6px">EST</span>':''}</span><span style="color:#6b6d75;font-size:12px">${esc(c.value||'')}${pend?' · pending':' · '+c.score}</span></div><div style="height:7px;background:#ecebf1;border-radius:99px;overflow:hidden"><div style="height:100%;width:${pend?'100%':c.score+'%'};background:${fill};border-radius:99px"></div></div></div>`;}).join("");
+ const sibs=(prodByIng[g.id]||[]).filter(x=>x.s!==p.s);
+ const classSibs=(prodByClass[cl?cl.id:-1]||[]).filter(x=>x.ing.id!==g.id);
+ const uniqClassIng={};classSibs.forEach(x=>{uniqClassIng[x.ing.id]=x;});
+ const hv=p.hist, hmax=Math.max(...hv.map(h=>h.signal_index),1);
  const fmtV=ds=>{try{return new Date(ds).toLocaleDateString('en-US',{month:'short',year:'numeric'});}catch(e){return '';}};
  const histHTML=hv.length?`<div style="display:flex;gap:7px;align-items:flex-end;height:76px;padding-top:16px">${hv.map(h=>`<div title="v${h.version} · ${h.signal_index}" style="flex:1;min-width:26px;height:${Math.round(h.signal_index/hmax*100)}%;min-height:22px;background:#eef0fb;border:1px solid rgba(17,17,20,.12);border-radius:4px 4px 0 0;position:relative;display:flex;align-items:flex-end;justify-content:center"><span style="position:absolute;top:-17px;font-size:10px;color:#8a8a93">v${h.version}</span><b style="font-size:10px;color:#33353c;padding-bottom:3px">${h.signal_index}</b></div>`).join("")}</div><p style="font-size:11.5px;color:#8a8a93;margin:10px 0 0">${hv.length===1?('Baseline version · '+fmtV(hv[0].created_at)+'. Each data update writes a new version.'):'Each data update writes a new index version.'}</p>`:'<p style="font-size:12px;color:#8a8a93;margin:10px 0 0">No version history yet.</p>';
- const marketHTML=(d.mkt&&d.mkt.length)?`<div style="margin-top:14px"><div style="font-size:12px;color:#8a8a93;margin-bottom:6px">Sold as</div><div style="display:flex;flex-wrap:wrap;gap:6px">${d.mkt.map(m=>`<span style="font-size:12.5px;border:1px solid rgba(17,17,20,.1);border-radius:8px;padding:4px 10px"><b>${esc(m.brand_name)}</b> <span style="color:#8a8a93">· ${esc(m.country)}</span></span>`).join("")}</div></div>`:'';
- const aboutHTML=(d.desc||d.wiki)?`<div style="${PANEL};margin-bottom:12px;display:flex;gap:20px;align-items:flex-start;flex-wrap:wrap"><div data-wiki="${esc(d.wiki||'')}" style="width:116px;height:116px;border-radius:12px;background:#fafafb;border:1px solid rgba(17,17,20,.08);flex:none;display:grid;place-items:center;color:#c4c3cc;font-size:10px">image</div><div style="flex:1;min-width:220px"><h3 style="${H3}">About this drug</h3><p style="margin:0;font-size:14px;color:#33353c;line-height:1.55">${esc(d.desc||'—')}</p>${marketHTML}</div></div>`:'';
- const strong=d.cp[0]>=80;
- const box=d.cp[0]>=65?`<div style="border:1px solid ${strong?'#f6c9c5':'#efd59c'};background:${strong?'#fdecea':'#faf1de'};border-radius:12px;padding:16px 18px;margin-bottom:12px"><div style="font-size:14px;font-weight:500;color:${strong?'#b42318':'#8a5a00'}">${esc((d.fda||'').split('.')[0].split(';')[0])}</div><p style="margin:6px 0 0;font-size:13px;color:#33353c">${esc(d.fda)}</p></div>`:'';
- const related=DRUGS.filter(x=>x.ty===d.ty&&x.s!==d.s).concat(DRUGS.filter(x=>x.mf===d.mf&&x.s!==d.s)).filter((x,i,a)=>a.indexOf(x)===i).slice(0,5);
- const psrc=SOURCES.filter(x=>['courtlistener','jpml','openfda-faers','sec-edgar'].includes(x.s));
- const srcChips=(psrc.length?psrc:SOURCES.slice(0,4)).map(x=>`<a href="#source-${x.s}" style="${CHIP};color:#33353c">${esc(x.nm)}</a>`).join("");
- const hasSucc=d.former.length||d.defs.length;
- const succ=hasSucc?`<div style="${PANEL};margin-bottom:12px"><h3 style="${H3}">Manufacturer &amp; defendants</h3>
-   <div style="display:flex;gap:12px;padding:9px 0;font-size:13px"><span style="flex:0 0 140px;color:#6b6d75;font-size:12.5px">Current maker</span><span><b>${esc(d.mf)}</b>${d.curType?' <span style="color:#8a8a93">· '+esc(d.curType)+'</span>':''}</span></div>
-   ${d.former.map(f=>`<div style="display:flex;gap:12px;padding:9px 0;border-top:1px solid rgba(17,17,20,.08);font-size:13px"><span style="flex:0 0 140px;color:#6b6d75;font-size:12.5px">Former / originator</span><span>${esc(f.name)}${f.to?' <span style="color:#8a8a93">· until '+esc(f.to)+'</span>':''}</span></div>`).join("")}
-   ${d.defs.length?`<div style="display:flex;gap:12px;padding:9px 0;border-top:1px solid rgba(17,17,20,.08);font-size:13px"><span style="flex:0 0 140px;color:#6b6d75;font-size:12.5px">Litigation defendant</span><span>${esc(d.defs.join(' + '))}</span></div>`:''}
-   <p style="font-size:11.5px;color:#8a8a93;margin:9px 0 0">The signal index belongs to the drug; it does not transfer to a successor as its own liability.</p></div>`:'';
- return `<div style="font-size:12px;color:#8a8a93;margin-bottom:14px;display:flex;gap:6px;flex-wrap:wrap"><a href="#browse" style="color:#3b63b8">Browse</a><span>/</span><span data-act="type:${esc(d.ty)}" style="color:#3b63b8;cursor:pointer">${esc(d.ty)}</span><span>/</span><span>${esc(d.br)}</span></div>
-  <div style="display:flex;flex-wrap:wrap;gap:16px;justify-content:space-between;align-items:flex-start;margin-bottom:16px">
-   <div style="min-width:0"><h1 style="margin:0;font-size:clamp(44px,6vw,80px);line-height:1;font-weight:500;letter-spacing:-0.035em">${esc(d.nm)}</h1>
-    <div style="color:#111114;font-size:clamp(19px,2vw,26px);line-height:1.3;letter-spacing:-0.015em;margin-top:18px">${esc(d.br)} · ${esc(d.ty)}</div>
-    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:11px">
-     <a href="#mfr-${d.mfs}" style="${CHIP};flex:none">${esc(d.mf)}</a>
-     ${d.mdl.id?`<a href="#mdl-${d.mdl.id}" style="${CHIP};flex:none">§ ${esc(d.mdl.d)}</a>`:`<span style="${CHIP};flex:none;cursor:default">${esc(d.mdl.d)}</span>`}
-     <span style="${CHIP};flex:none;cursor:default">${esc(ST[d.st]||d.st)}</span></div></div>
+ const linkMembers=[p].concat(sibs);
+ return `<div style="font-size:12px;color:#8a8a93;margin-bottom:14px;display:flex;gap:6px;flex-wrap:wrap">${cl?`<a href="#class-${cl.slug}" style="color:#3b63b8">${esc(cl.name)}</a><span>›</span>`:''}<a href="#ingredient-${g.slug}" style="color:#3b63b8">${esc(g.inn)}</a><span>›</span><span>${esc(p.br)}</span></div>
+  <div style="display:flex;flex-wrap:wrap;gap:16px;justify-content:space-between;align-items:flex-start;margin-bottom:14px">
+   <div style="min-width:0"><h1 style="margin:0;font-size:clamp(42px,6vw,72px);line-height:1;font-weight:500;letter-spacing:-0.035em">${esc(p.br)}</h1>
+    <div style="color:#33353c;font-size:clamp(17px,2vw,22px);line-height:1.3;letter-spacing:-0.01em;margin-top:14px"><a href="#ingredient-${g.slug}" style="color:#3b63b8">${esc(g.inn)}</a>${cl?' · '+esc(cl.name):''}</div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:12px">
+     ${p.mfs?`<a href="#mfr-${p.mfs}" style="${CHIP};display:inline-flex;align-items:center;gap:7px">${logoHTML(manBySlug(p.mfs)?manBySlug(p.mfs).site:null,p.mf,16)}${esc(p.mf)}</a>`:''}
+     ${p.ind?`<span style="${CHIP};cursor:default">${esc(p.ind)}</span>`:''}
+     ${p.form?`<span style="${CHIP};cursor:default">${esc(p.form)}</span>`:''}</div></div>
    <div style="border:1px solid rgba(17,17,20,.08);border-radius:20px;padding:22px 28px;text-align:center;min-width:200px;background:#fff;box-shadow:0 30px 60px -40px rgba(17,17,20,.25)">
-    <div style="font-size:13px;color:#8a8a93;margin-bottom:8px">Signal index</div>
-    <div style="display:flex;flex-direction:column;align-items:center;gap:6px">${gauge(d.bd,d.ix,200,120,56)}<span style="font-size:15px;color:${TIER[d.bd][0]}">${d.bd}</span></div></div></div>
-  ${aboutHTML}
-  <div style="${PANEL};margin-bottom:12px"><h3 style="${H3}">Signal components</h3>${comps}<p style="font-size:11.5px;color:#8a8a93;margin:6px 0 0"><b>Confidence:</b> ${esc(d.conf)}. Not a safety rating or verdict.</p></div>
-  ${succ}
+    <div style="font-size:13px;color:#8a8a93;margin-bottom:8px">Litigation Signal Index</div>
+    <div style="display:flex;flex-direction:column;align-items:center;gap:6px">${gauge(p.bd,p.ix,200,120,56)}<span style="font-size:15px;color:${TIER[p.bd]?TIER[p.bd][0]:'#6b6d75'}">${p.bd}</span></div></div></div>
+
+  <div style="background:#eef0fb;border:1px solid #cfd5f6;border-radius:16px;padding:16px 18px;margin-bottom:12px">
+   <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">${scopeBadge('molecule')}<span style="font-size:14px;font-weight:500;color:#2f3fbf">This index is calculated for the active ingredient — ${esc(g.inn)}</span></div>
+   <p style="margin:0 0 ${linkMembers.length>1?'10px':'0'};font-size:13px;color:#33353c">Safety signals (FDA action, FAERS adverse events) are measured per active ingredient, so every medicine containing ${esc(g.inn)} carries the same index. These products differ in their <b>indication, form and dose</b>, not in this score.</p>
+   ${linkMembers.length>1?`<div style="display:flex;gap:7px;flex-wrap:wrap">${linkMembers.map(x=>x.s===p.s?`<span style="${CHIP};background:#3b63b8;color:#fff;border-color:#3b63b8;cursor:default">${esc(x.br)} · you're here</span>`:`<a href="#product-${x.s}" style="${CHIP}">${esc(x.br)}${x.ind?' · '+esc(x.ind.split(' ').slice(0,2).join(' ')):''}</a>`).join("")}</div>`:''}
+  </div>
+
+  <div style="${PANEL};margin-bottom:12px;display:flex;gap:20px;align-items:flex-start;flex-wrap:wrap"><div data-wiki="${esc(g.wiki||'')}" style="width:116px;height:116px;border-radius:12px;background:#fafafb;border:1px solid rgba(17,17,20,.08);flex:none;display:grid;place-items:center;color:#c4c3cc;font-size:10px">image</div><div style="flex:1;min-width:220px"><h3 style="${H3}">What is ${esc(p.br)}?</h3><p style="margin:0;font-size:14px;color:#33353c;line-height:1.55">${esc(p.desc||g.desc||'—')}</p></div></div>
+
+  <div style="${PANEL};margin-bottom:12px"><h3 style="${H3}">Signal components</h3>${comps}<p style="font-size:11.5px;color:#8a8a93;margin:6px 0 0"><b>Confidence:</b> ${esc(p.conf||'—')}. Badges show the level each input is measured at. Not a safety rating or verdict.</p></div>
+
+  <div style="${PANEL};margin-bottom:12px"><h3 style="${H3}">Cases &amp; outcomes</h3>${caseRows(p.cases)}</div>
+
   <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:12px">
-   <div style="${PANEL};margin-bottom:12px"><h3 style="${H3}">Cases &amp; outcomes</h3>
-    <div style="display:flex;gap:12px;padding:9px 0;font-size:13px"><span style="flex:0 0 120px;color:#6b6d75;font-size:12.5px">Docket</span><span>${esc(d.mdl.d)}${d.mdl.id?' · '+esc(d.mdl.court):''}</span></div>
-    <div style="display:flex;gap:12px;padding:9px 0;border-top:1px solid rgba(17,17,20,.08);font-size:13px"><span style="flex:0 0 120px;color:#6b6d75;font-size:12.5px">Alleged injury</span><span>${esc(d.mdl.inj)}</span></div>
-    <div style="display:flex;gap:12px;padding:9px 0;border-top:1px solid rgba(17,17,20,.08);font-size:13px"><span style="flex:0 0 120px;color:#6b6d75;font-size:12.5px">Pending</span><span style="font-family:ui-monospace,monospace">${esc(d.mdl.pend)}</span></div>
-    <div style="display:flex;gap:12px;padding:9px 0;border-top:1px solid rgba(17,17,20,.08);font-size:13px"><span style="flex:0 0 120px;color:#6b6d75;font-size:12.5px">Outcome</span><span>${esc(d.cp[8])}</span></div></div>
-   <div style="${PANEL};margin-bottom:12px"><h3 style="${H3}">FDA / regulatory</h3>${box}<div style="display:flex;gap:12px;padding:9px 0;font-size:13px"><span style="flex:0 0 120px;color:#6b6d75;font-size:12.5px">Summary</span><span>${esc(d.fda)}</span></div></div></div>
-  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:12px">
-   <div style="${PANEL};margin-bottom:12px"><h3 style="${H3}">Score history (versions)</h3>${histHTML}</div>
-   <div style="${PANEL};margin-bottom:12px"><h3 style="${H3}">Public API</h3><div style="color:#6b6d75;background:#fafafb;border:1px solid rgba(17,17,20,.08);border-radius:12px;padding:14px 16px;overflow-x:auto;white-space:pre;font-size:13px;line-height:1.6"><span style="color:#3b63b8">GET</span> /rest/v1/v_public_drug?slug=eq.${esc(d.s)}
-<span style="color:#8a8a93">Host:</span> pbzkpsrmsvapyjbdatdr.supabase.co</div><div style="margin-top:9px;display:flex;gap:8px"><a href="${SB_URL}/rest/v1/v_public_drug?slug=eq.${esc(d.s)}&apikey=${SB_KEY}" target="_blank" rel="noopener" style="${CHIP};color:#3b63b8">Open JSON ↗</a></div><p style="font-size:11px;color:#8a8a93;margin:8px 0 0">Public read-only endpoint (anon key).</p></div></div>
-  <div style="${PANEL};margin-bottom:12px"><h3 style="${H3}">Related</h3><div style="display:flex;flex-wrap:wrap;gap:7px">${related.map(r=>`<a href="#drug-${r.s}" style="${CHIP}">${esc(r.br)} · ${r.ix}</a>`).join("")}<a href="#mfr-${d.mfs}" style="${CHIP};color:#3b63b8">all “${esc(d.mf)}” →</a></div></div>
-  <div style="${PANEL}"><h3 style="${H3}">Sources (public records)</h3><div style="display:flex;flex-wrap:wrap;gap:7px">${srcChips}</div></div>`;
+   <div style="${PANEL};margin-bottom:12px"><h3 style="${H3}">FDA / regulatory</h3>${g.boxed?`<div style="border:1px solid #efd59c;background:#faf1de;border-radius:12px;padding:12px 14px;margin-bottom:10px;font-size:13px;color:#8a5a00"><b>Boxed/﻿key warning:</b> ${esc(g.boxed)}</div>`:''}<p style="margin:0;font-size:13px;color:#33353c">${esc(g.fda||'—')}</p></div>
+   <div style="${PANEL};margin-bottom:12px"><h3 style="${H3}">Score history (versions)</h3>${histHTML}</div></div>
+
+  <div style="${PANEL};margin-bottom:12px"><h3 style="${H3}">Public API</h3><div style="color:#6b6d75;background:#fafafb;border:1px solid rgba(17,17,20,.08);border-radius:12px;padding:14px 16px;overflow-x:auto;white-space:pre;font-size:13px;line-height:1.6"><span style="color:#3b63b8">GET</span> /rest/v1/v_public_product?slug=eq.${esc(p.s)}
+<span style="color:#8a8a93">Host:</span> pbzkpsrmsvapyjbdatdr.supabase.co</div><div style="margin-top:9px"><a href="${SB_URL}/rest/v1/v_public_product?slug=eq.${esc(p.s)}&apikey=${SB_KEY}" target="_blank" rel="noopener" style="${CHIP};color:#3b63b8">Open JSON ↗</a></div></div>
+
+  <div style="${PANEL}"><h3 style="${H3}">Related</h3>
+   ${sibs.length?`<div style="font-size:12.5px;color:#8a8a93;margin-bottom:6px">Same ingredient (${esc(g.inn)})</div><div style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:12px">${sibs.map(x=>`<a href="#product-${x.s}" style="${CHIP}">${esc(x.br)} · ${x.ix==null?'—':x.ix}</a>`).join("")}</div>`:''}
+   ${Object.keys(uniqClassIng).length?`<div style="font-size:12.5px;color:#8a8a93;margin-bottom:6px">Same class${cl?' ('+esc(cl.name)+')':''}</div><div style="display:flex;gap:7px;flex-wrap:wrap">${Object.values(uniqClassIng).map(x=>`<a href="#product-${x.s}" style="${CHIP}">${esc(x.br)} · ${esc(x.ing.inn)}</a>`).join("")}</div>`:''}
+  </div>`;
 }
 
-function pGroup(route){
- if(route.startsWith('mfr-')){
-   const slug=route.slice(4), m=MANS[slug];
-   if(!m)return `<div style="${PANEL}">Manufacturer not found.</div>`;
-   const avg=m.avg, bd=bandOf(avg);
-   return `<div style="font-size:12px;color:#8a8a93;margin-bottom:14px;display:flex;gap:6px;flex-wrap:wrap"><a href="#browse" style="color:#3b63b8">Browse</a><span>/</span><span>Manufacturer</span><span>/</span><span>${esc(m.name)}</span></div>
-    <div style="display:flex;flex-wrap:wrap;gap:16px;justify-content:space-between;align-items:flex-start;margin-bottom:16px">
-     <div style="display:flex;gap:16px;align-items:flex-start;min-width:0">${logoHTML(m.site,m.name,56)}<div style="min-width:0"><h1 style="margin:0;font-size:clamp(44px,6vw,80px);line-height:1;font-weight:500;letter-spacing:-0.035em">${esc(m.name)}</h1><div style="color:#111114;font-size:clamp(19px,2vw,26px);line-height:1.3;letter-spacing:-0.015em;margin-top:18px">Manufacturer · ${m.drugs.length} drugs${m.hq?' · '+esc(m.hq):''}${m.founded?' · est. '+esc(m.founded):''}</div>${m.site?`<a href="https://${esc(m.site)}" target="_blank" rel="noopener" style="${CHIP};color:#3b63b8;margin-top:12px;display:inline-block">${esc(m.site)} ↗</a>`:''}</div></div>
-     <div style="border:1px solid rgba(17,17,20,.08);border-radius:20px;padding:22px 28px;text-align:center;min-width:200px;background:#fff;box-shadow:0 30px 60px -40px rgba(17,17,20,.25)"><div style="font-size:13px;color:#8a8a93;margin-bottom:8px">Avg index</div><div style="display:flex;flex-direction:column;align-items:center;gap:6px">${gauge(bd,avg,160,96,44)}<span style="font-size:14px;color:${TIER[bd][0]}">${bd}</span></div><div style="font-size:11.5px;color:#6b6d75;margin-top:6px">across ${m.drugs.length} drugs</div></div></div>
-    ${m.desc?`<div style="${PANEL};margin-bottom:12px"><p style="margin:0;font-size:14px;color:#33353c;line-height:1.55">${esc(m.desc)}</p></div>`:''}
-    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:11px">${[...m.drugs].sort((a,b)=>b.ix-a.ix).map(drugCard).join("")}</div>`;
- } else {
-   const id=route.slice(4), m=MDLS[id];
-   if(!m)return `<div style="${PANEL}">MDL not found.</div>`;
-   return `<div style="font-size:12px;color:#8a8a93;margin-bottom:14px;display:flex;gap:6px;flex-wrap:wrap"><a href="#browse" style="color:#3b63b8">Browse</a><span>/</span><span>MDL</span><span>/</span><span>${esc(m.docket)}</span></div>
-    <div style="display:flex;flex-wrap:wrap;gap:16px;justify-content:space-between;align-items:flex-start;margin-bottom:16px">
-     <div><h1 style="margin:0;font-size:clamp(44px,6vw,80px);line-height:1;font-weight:500;letter-spacing:-0.035em">${esc(m.docket)}</h1><div style="color:#111114;font-size:clamp(19px,2vw,26px);line-height:1.3;letter-spacing:-0.015em;margin-top:18px">${esc(m.court)} · ${esc(m.inj)} · status: ${esc(ST[m.st]||m.st)}</div></div>
-     <div style="border:1px solid rgba(17,17,20,.08);border-radius:20px;padding:22px 28px;text-align:center;min-width:200px;background:#fff;box-shadow:0 30px 60px -40px rgba(17,17,20,.25)"><div style="font-size:13px;color:#8a8a93;margin-bottom:8px">Pending</div><div style="font-variant-numeric:tabular-nums;font-weight:500;letter-spacing:-0.03em;font-size:40px;line-height:1.1">${esc(m.pend)}</div><div style="font-size:11.5px;color:#6b6d75;margin-top:6px">cases</div></div></div>
-    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:11px">${m.drugs.map(drugCard).join("")}</div>`;
- }
+function pIngredient(slug){
+ const g=ingBySlug(slug); if(!g)return `<div style="${PANEL}">Ingredient not found.</div>`;
+ const cl=CLS[g.class_id];
+ const prods=(prodByIng[g.id]||[]);
+ const ix=prods.length?prods[0].ix:null, bd=prods.length?prods[0].bd:'None';
+ const allCases=[];prods.forEach(p=>p.cases.forEach(c=>{if(!allCases.find(x=>x.id===c.id))allCases.push(c);}));
+ return `<div style="font-size:12px;color:#8a8a93;margin-bottom:14px;display:flex;gap:6px;flex-wrap:wrap">${cl?`<a href="#class-${cl.slug}" style="color:#3b63b8">${esc(cl.name)}</a><span>›</span>`:''}<span>${esc(g.inn)}</span></div>
+  <div style="display:flex;flex-wrap:wrap;gap:16px;justify-content:space-between;align-items:flex-start;margin-bottom:14px">
+   <div style="min-width:0"><div style="font-size:13px;color:#8a8a93;margin-bottom:4px">Active ingredient</div><h1 style="margin:0;font-size:clamp(40px,6vw,68px);line-height:1;font-weight:500;letter-spacing:-0.035em">${esc(g.inn)}</h1><div style="color:#33353c;font-size:clamp(16px,2vw,21px);margin-top:12px">${cl?'<a href="#class-'+cl.slug+'" style="color:#3b63b8">'+esc(cl.name)+'</a>':''}</div></div>
+   <div style="border:1px solid rgba(17,17,20,.08);border-radius:20px;padding:22px 28px;text-align:center;min-width:200px;background:#fff;box-shadow:0 30px 60px -40px rgba(17,17,20,.25)"><div style="font-size:13px;color:#8a8a93;margin-bottom:8px">Signal index</div><div style="display:flex;flex-direction:column;align-items:center;gap:6px">${gauge(bd,ix,160,96,44)}<span style="font-size:14px;color:${TIER[bd]?TIER[bd][0]:'#6b6d75'}">${bd}</span></div><div style="font-size:11px;color:#6b6d75;margin-top:6px">shared by all brands below</div></div></div>
+  <div style="${PANEL};margin-bottom:12px"><h3 style="${H3}">About</h3><p style="margin:0;font-size:14px;color:#33353c">${esc(g.desc||'—')}</p></div>
+  <div style="margin-bottom:12px"><div style="font-size:13px;color:#8a8a93;margin-bottom:8px">Brands containing ${esc(g.inn)}</div><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:11px">${prods.map(prodCard).join("")}</div></div>
+  <div style="${PANEL}"><h3 style="${H3}">Cases &amp; outcomes</h3>${caseRows(allCases)}</div>`;
 }
+
+function pClass(slug){
+ const c=clsBySlug(slug); if(!c)return `<div style="${PANEL}">Class not found.</div>`;
+ const prods=(prodByClass[c.id]||[]);
+ const ixs=prods.filter(p=>p.ix!=null).map(p=>p.ix);const avg=ixs.length?Math.round(ixs.reduce((a,b)=>a+b,0)/ixs.length):null;const bd=bandOf(avg);
+ const ings=c.ings;
+ return `<div style="font-size:12px;color:#8a8a93;margin-bottom:14px;display:flex;gap:6px;flex-wrap:wrap"><a href="#browse" style="color:#3b63b8">Browse</a><span>›</span><span>${esc(c.name)}</span></div>
+  <div style="display:flex;flex-wrap:wrap;gap:16px;justify-content:space-between;align-items:flex-start;margin-bottom:14px">
+   <div style="min-width:0"><div style="font-size:13px;color:#8a8a93;margin-bottom:4px">Drug class</div><h1 style="margin:0;font-size:clamp(36px,5vw,60px);line-height:1.02;font-weight:500;letter-spacing:-0.03em">${esc(c.name)}</h1><p style="color:#33353c;font-size:clamp(15px,1.8vw,19px);margin:12px 0 0;max-width:52ch">${esc(c.summary||'')}</p></div>
+   <div style="border:1px solid rgba(17,17,20,.08);border-radius:20px;padding:22px 28px;text-align:center;min-width:200px;background:#fff;box-shadow:0 30px 60px -40px rgba(17,17,20,.25)"><div style="font-size:13px;color:#8a8a93;margin-bottom:8px">Avg index</div><div style="display:flex;flex-direction:column;align-items:center;gap:6px">${gauge(bd,avg,160,96,44)}<span style="font-size:14px;color:${TIER[bd]?TIER[bd][0]:'#6b6d75'}">${bd}</span></div><div style="font-size:11px;color:#6b6d75;margin-top:6px">${ings.length} ingredients · ${prods.length} brands</div></div></div>
+  ${ings.map(g=>`<div style="margin-bottom:14px"><div style="font-size:13px;color:#8a8a93;margin-bottom:8px"><a href="#ingredient-${g.slug}" style="color:#3b63b8">${esc(g.inn)}</a></div><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:11px">${(prodByIng[g.id]||[]).map(prodCard).join("")}</div></div>`).join("")}`;
+}
+
+function pMfr(slug){
+ const m=manBySlug(slug); if(!m)return `<div style="${PANEL}">Manufacturer not found.</div>`;
+ const prods=PRODUCTS.filter(p=>p.mfs===slug);
+ const ixs=prods.filter(p=>p.ix!=null).map(p=>p.ix);const avg=ixs.length?Math.round(ixs.reduce((a,b)=>a+b,0)/ixs.length):null;const bd=bandOf(avg);
+ return `<div style="font-size:12px;color:#8a8a93;margin-bottom:14px;display:flex;gap:6px;flex-wrap:wrap"><a href="#browse" style="color:#3b63b8">Browse</a><span>›</span><span>${esc(m.name)}</span></div>
+  <div style="display:flex;flex-wrap:wrap;gap:16px;justify-content:space-between;align-items:flex-start;margin-bottom:14px">
+   <div style="display:flex;gap:16px;align-items:flex-start;min-width:0">${logoHTML(m.site,m.name,56)}<div style="min-width:0"><h1 style="margin:0;font-size:clamp(40px,6vw,66px);line-height:1;font-weight:500;letter-spacing:-0.035em">${esc(m.name)}</h1><div style="color:#33353c;font-size:clamp(15px,1.8vw,20px);margin-top:14px">Manufacturer · ${prods.length} products${m.hq?' · '+esc(m.hq):''}${m.founded?' · est. '+esc(m.founded):''}</div>${m.site?`<a href="https://${esc(m.site)}" target="_blank" rel="noopener" style="${CHIP};color:#3b63b8;margin-top:12px;display:inline-block">${esc(m.site)} ↗</a>`:''}</div></div>
+   ${avg!=null?`<div style="border:1px solid rgba(17,17,20,.08);border-radius:20px;padding:22px 28px;text-align:center;min-width:190px;background:#fff;box-shadow:0 30px 60px -40px rgba(17,17,20,.25)"><div style="font-size:13px;color:#8a8a93;margin-bottom:8px">Avg index</div><div style="display:flex;flex-direction:column;align-items:center;gap:6px">${gauge(bd,avg,150,90,40)}<span style="font-size:14px;color:${TIER[bd]?TIER[bd][0]:'#6b6d75'}">${bd}</span></div></div>`:''}</div>
+  ${m.desc?`<div style="${PANEL};margin-bottom:12px"><p style="margin:0;font-size:14px;color:#33353c">${esc(m.desc)}</p></div>`:''}
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:11px">${prods.map(prodCard).join("")}</div>`;
+}
+
 function pSource(slug){
  const x=srcBySlug(slug); if(!x)return `<div style="${PANEL}">Source not found.</div>`;
  const a=ACC[x.acc]||ACC.paid;
- return `<div style="font-size:12px;color:#8a8a93;margin-bottom:14px;display:flex;gap:6px;flex-wrap:wrap"><a href="#methodology" style="color:#3b63b8">Methodology</a><span>/</span><span>Source</span><span>/</span><span>${esc(x.nm)}</span></div>
-  <h1 style="margin:0;font-size:clamp(44px,6vw,80px);line-height:1;font-weight:500;letter-spacing:-0.035em">${esc(x.nm)}</h1>
-  <div style="display:flex;gap:6px;margin:10px 0 16px;flex-wrap:wrap"><span style="${CHIP};cursor:default">${esc(x.cat)}</span><span style="display:inline-flex;align-items:center;gap:6px;font-size:12.5px;padding:3px 9px;border-radius:4px;background:${a[1]};border:1px solid ${a[2]};color:${a[0]}"><span style="width:5px;height:5px;border-radius:50%;background:${a[0]}"></span>${esc(x.acc)}</span></div>
+ return `<div style="font-size:12px;color:#8a8a93;margin-bottom:14px;display:flex;gap:6px;flex-wrap:wrap"><a href="#methodology" style="color:#3b63b8">Methodology</a><span>›</span><span>${esc(x.nm)}</span></div>
+  <h1 style="margin:0;font-size:clamp(36px,5vw,60px);line-height:1.02;font-weight:500;letter-spacing:-0.03em">${esc(x.nm)}</h1>
+  <div style="display:flex;gap:6px;margin:12px 0 16px;flex-wrap:wrap"><span style="${CHIP};cursor:default">${esc(x.cat)}</span><span style="display:inline-flex;align-items:center;gap:6px;font-size:12.5px;padding:3px 9px;border-radius:4px;background:${a[1]};border:1px solid ${a[2]};color:${a[0]}"><span style="width:5px;height:5px;border-radius:50%;background:${a[0]}"></span>${esc(x.acc)}</span></div>
   <div style="${PANEL}"><h3 style="${H3}">What it is</h3><p style="font-size:14px;color:#33353c;margin:0">${esc(x.note)}</p></div>`;
 }
+
 function pMethod(){
  const m=c=>SOURCES.filter(x=>x.cat===c).map(x=>`<a href="#source-${x.s}" style="${CHIP}">${esc(x.nm)}</a>`).join("");
  const EB="font-size:13px;color:#8a8a93;margin-bottom:8px";
@@ -297,38 +325,33 @@ function pMethod(){
  const node=(t,s)=>`<div style="flex:1;min-width:128px;background:#fff;border:1px solid rgba(17,17,20,.1);border-radius:12px;padding:12px 14px;font-size:12.5px"><b>${t}</b><div style="color:#6b6d75;margin-top:4px">${s}</div></div>`;
  const arr='<div style="display:flex;align-items:center;color:#b9b8c4;font-size:20px">→</div>';
  return `<div style="${EB}">Methodology</div><h1 style="font-size:clamp(30px,3.6vw,44px);line-height:1.05;font-weight:500;margin:0 0 20px;letter-spacing:-0.03em">How the Litigation Signal Index is computed</h1>
-  <p style="font-size:clamp(18px,2vw,22px);line-height:1.4;letter-spacing:-0.015em;color:#33353c;margin:0 0 18px;max-width:62ch;text-wrap:pretty">A transparent, weighted score to navigate a drug's public litigation and regulatory record. It is <b>not</b> a validated measure of clinical risk and not an FDA or WHO rating — it is an editorial composite we build from public data. Here is exactly how, and what is our judgement versus an established standard.</p>
+  <p style="font-size:clamp(18px,2vw,22px);line-height:1.4;letter-spacing:-0.015em;color:#33353c;margin:0 0 18px;max-width:62ch;text-wrap:pretty">A transparent, weighted score to navigate a drug's public litigation and regulatory record. It is <b>not</b> a validated measure of clinical risk and not an FDA or WHO rating — it is an editorial composite we build from public data. It is calculated per <b>active ingredient</b>, so brands of the same drug share a score.</p>
   <div style="${WARN};margin-bottom:18px"><b>What it is — and isn't.</b> A navigation aid over public records. High means “a lot of legal and regulatory activity worth reading,” not “dangerous”; low is not a safety guarantee. A lawsuit is an allegation, not proof of harm. Not medical or legal advice.</div>
-
   <div style="${PANEL};margin-bottom:12px"><div style="${EB}">The pipeline at a glance</div><h3 style="${H3}">From public records to one number</h3>
    <div style="display:flex;gap:10px;flex-wrap:wrap;margin:16px 0 6px">${node('Public records','FDA notices · MDL/court dockets · FAERS · SEC')}${arr}${node('4 component scores','each mapped to 0–100')}${arr}${node('× weight','30 / 25 / 25 / 20')}${arr}${node('Σ = Index','0–100')}${arr}${node('Band','Low · Moderate · Elevated · High')}</div>
-   <p style="color:#6b6d75;font-size:12.5px;margin:12px 0 0">If a component has no data (e.g. outcomes still pending), its weight is removed and the rest are rescaled, and <b>confidence</b> is lowered rather than guessing.</p></div>
-
+   <p style="color:#6b6d75;font-size:12.5px;margin:12px 0 0">Components are measured at the level they belong to — <b>molecule</b> (FDA action, FAERS), <b>class</b> (class-wide MDLs) or <b>brand</b> — and inherited by the product, which is why a card labels each input's scope. If a component has no data (e.g. outcomes pending), its weight is removed and the rest rescaled, and confidence is lowered.</p></div>
   <div style="${PANEL};margin-bottom:12px"><div style="${EB}">The formula</div><div style="${BOX};font-family:ui-monospace,monospace;font-size:13px;line-height:1.8">Index = Σ ( component_score × weight ) ÷ Σ ( weight of components with data )<br>bands:  Low 0–24 ·  Moderate 25–49 ·  Elevated 50–74 ·  High 75–100</div></div>
-
   <div style="${PANEL};margin-bottom:12px"><div style="${EB}">The four factors</div><h3 style="${H3}">What each measures, where it comes from, and why its weight</h3>
    <div style="overflow-x:auto"><table style="border-collapse:collapse;width:100%;min-width:620px;font-size:13.5px">
     <thead><tr><th style="${TH};width:132px">Factor</th><th style="${TH}">Measures</th><th style="${TH}">Source</th><th style="${TH};width:58px">Weight</th><th style="${TH};width:32%">Why this weight</th></tr></thead>
     <tbody>
      <tr><td style="${TD}"><b>Regulatory action</b></td><td style="${TD}">Boxed warnings, safety communications, label changes, recalls, withdrawals</td><td style="${TD}">FDA/openFDA, Federal Register, MHRA, EMA</td><td style="${TD};color:#3b63b8;font-weight:500">30%</td><td style="${TD}">A regulator acting is the strongest external, adjudicated signal — the closest thing to an authority's verdict.</td></tr>
      <tr><td style="${TD}"><b>Litigation volume</b></td><td style="${TD}">Number/size of filings and MDLs, normalized by exposure</td><td style="${TD}">CourtListener/RECAP, JPML, PACER</td><td style="${TD};color:#3b63b8;font-weight:500">25%</td><td style="${TD}">Breadth of claims — but raw counts track sales and solicitation, so it is exposure-normalized and capped.</td></tr>
-     <tr><td style="${TD}"><b>AE severity</b></td><td style="${TD}">How serious reported adverse events are</td><td style="${TD}">openFDA FAERS</td><td style="${TD};color:#3b63b8;font-weight:500">25%</td><td style="${TD}">Real-world seriousness — but spontaneous reporting is biased, so it cannot dominate.</td></tr>
+     <tr><td style="${TD}"><b>AE severity</b></td><td style="${TD}">How serious reported adverse events are (ROR)</td><td style="${TD}">openFDA FAERS</td><td style="${TD};color:#3b63b8;font-weight:500">25%</td><td style="${TD}">Real-world seriousness — but spontaneous reporting is biased, so it cannot dominate.</td></tr>
      <tr><td style="${TD}"><b>Court outcomes</b></td><td style="${TD}">Verdicts, dismissals, settlements once resolved</td><td style="${TD}">Court dockets, SEC filings</td><td style="${TD};color:#3b63b8;font-weight:500">20%</td><td style="${TD}">Most meaningful when resolved — but &gt;95% settle with no admission and many stay pending, so lowest and dropped while pending.</td></tr>
     </tbody></table></div>
    <p style="color:#6b6d75;font-size:12.5px;margin:12px 0 0"><b>On the weights:</b> 30/25/25/20 is our editorial judgement (v1), not a figure from a study. We publish and version it — this is the part that is a choice, not a standard.</p></div>
-
   <div style="${PANEL};margin-bottom:12px"><div style="${EB}">Inside the AE-severity factor</div><h3 style="${H3}">A standard signal metric — not our own weighting</h3>
-   <p style="font-size:14px;color:#33353c;margin:0 0 10px">This factor is the <b>Reporting Odds Ratio (ROR)</b> for serious outcomes — the signal-detection metric used by the EMA and MHRA. From openFDA FAERS we build the 2×2 table of the drug versus every other drug, serious vs non-serious reports:</p>
+   <p style="font-size:14px;color:#33353c;margin:0 0 10px">This factor is the <b>Reporting Odds Ratio (ROR)</b> for serious outcomes — the signal-detection metric used by the EMA and MHRA — built from openFDA FAERS as the drug versus every other drug, serious vs non-serious reports:</p>
    <div style="${BOX};font-family:ui-monospace,monospace;font-size:12.5px;line-height:1.8;margin-bottom:12px">ROR = (a·d) / (b·c)   —  a,b = the drug's serious / non-serious reports;  c,d = all other drugs'<br>95% CI = exp( ln ROR ± 1.96·√(1/a+1/b+1/c+1/d) )<br>AE_score = 100 × ( 1 − 1 / ROR_lower95 ),  capped 0–100</div>
-   <p style="font-size:13px;color:#6b6d75;margin:0 0 12px">ROR &gt; 1 means the drug's reports skew more serious than the average FAERS drug. We score off the conservative lower 95% bound, so small / under-powered samples pull toward 0; drugs with fewer than 50 reports stay marked EST.</p>
-   <div style="${WARN}"><b>Why ROR.</b> FDA, WHO and EMA publish no single “danger score” per drug — they use disproportionality metrics one drug–event pair at a time: PRR, ROR, IC/BCPNN (WHO Uppsala), EBGM/MGPS (FDA). We use ROR (exact from public counts, with a confidence interval). EBGM — FDA's Bayesian-shrinkage method, sturdier on small counts — is a planned refinement.</div></div>
-
+   <p style="font-size:13px;color:#6b6d75;margin:0 0 12px">ROR &gt; 1 means the drug skews more serious than the average FAERS drug. We score off the conservative lower 95% bound; drugs with fewer than 50 reports stay marked EST.</p>
+   <div style="${WARN}"><b>Why ROR.</b> FDA, WHO and EMA publish no single “danger score” per drug — they use disproportionality metrics one drug–event pair at a time: PRR, ROR, IC/BCPNN (WHO Uppsala), EBGM/MGPS (FDA). We use ROR (exact from public counts, with a CI). EBGM — FDA's Bayesian-shrinkage method — is a planned refinement.</div></div>
   <div style="${PANEL};margin-bottom:12px;border-color:#cfd5f6"><div style="${EB};color:#2f3fbf">Worked example · fictional</div><h3 style="${H3}">Veltraxa (velcarbide) — Caldwell Therapeutics</h3>
    <p style="font-size:13px;color:#6b6d75;margin:0 0 14px">A made-up drug and company, only to show the arithmetic.</p>
    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr));gap:10px;margin-bottom:14px">
     <div style="${BOX}"><div style="${EB}">① Regulatory</div><div style="font-size:13px">1 FDA safety comm. (2025) + label warning; no boxed warning. <b>→ 60</b></div></div>
     <div style="${BOX}"><div style="${EB}">② Litigation volume</div><div style="font-size:13px">MDL, ~1,200 cases; normalized to ≈2M patient-years. <b>→ 55</b></div></div>
-    <div style="${BOX}"><div style="${EB}">③ AE severity (FAERS ROR)</div><div style="font-size:13px">12,400 reports; ROR 2.0 (95% CI 2.0–2.1) for serious outcomes. <span style="font-family:ui-monospace,monospace;font-size:12px">100×(1−1/2.0)</span> <b>→ 50</b></div></div>
+    <div style="${BOX}"><div style="${EB}">③ AE severity (FAERS ROR)</div><div style="font-size:13px">ROR 2.0 (95% CI 2.0–2.1). <span style="font-family:ui-monospace,monospace;font-size:12px">100×(1−1/2.0)</span> <b>→ 50</b></div></div>
     <div style="${BOX}"><div style="${EB}">④ Court outcomes</div><div style="font-size:13px">2 bellwethers (1 plaintiff, 1 defense); no global settlement. <b>→ 50</b></div></div>
    </div>
    <div style="${BOX};font-size:13px;font-family:ui-monospace,monospace;line-height:1.9">
@@ -337,51 +360,47 @@ function pMethod(){
     <div style="display:flex;justify-content:space-between;color:#6b6d75"><span>AE severity 50 × 0.25</span><span>= 12.50</span></div>
     <div style="display:flex;justify-content:space-between;color:#6b6d75"><span>Outcomes 50 × 0.20</span><span>= 10.00</span></div>
     <div style="display:flex;justify-content:space-between;border-top:1px solid rgba(17,17,20,.15);margin-top:6px;padding-top:6px;font-weight:600"><span>Index = Σ</span><span>54.25</span></div></div>
-   <div style="display:flex;align-items:center;gap:12px;margin-top:12px"><span style="font-size:32px;font-weight:500;letter-spacing:-0.03em;font-variant-numeric:tabular-nums">54</span><span style="font-size:13.5px;color:#d9a23c;border:1px solid #efd59c;background:#faf1de;border-radius:999px;padding:4px 12px">Elevated (50–74)</span></div>
-   <div style="${BOX};border-style:dashed;margin-top:14px"><div style="${EB}">If outcomes were still pending</div><div style="font-size:13px">Drop ④, rescale the rest (÷0.80): <span style="font-family:ui-monospace,monospace;font-size:12.5px">0.375·60 + 0.3125·55 + 0.3125·50 = 55.3 → 55</span> — same ballpark, shown with <b>lower confidence</b>. We never invent an outcome score.</div></div></div>
-
+   <div style="display:flex;align-items:center;gap:12px;margin-top:12px"><span style="font-size:32px;font-weight:500;letter-spacing:-0.03em;font-variant-numeric:tabular-nums">54</span><span style="font-size:13.5px;color:#d9a23c;border:1px solid #efd59c;background:#faf1de;border-radius:999px;padding:4px 12px">Elevated (50–74)</span></div></div>
   <div style="${PANEL};margin-bottom:12px"><div style="${EB}">Provenance — what is standard, what is ours</div>
    <div style="overflow-x:auto"><table style="border-collapse:collapse;width:100%;min-width:520px;font-size:13.5px">
     <thead><tr><th style="${TH}">Element</th><th style="${TH};width:140px">Status</th><th style="${TH}">Basis</th></tr></thead>
     <tbody>
      <tr><td style="${TD}">Public records (FDA notices, dockets, SEC)</td><td style="${TD}">${tagObj}</td><td style="${TD}">Primary sources, cited per drug</td></tr>
      <tr><td style="${TD}">FAERS “serious” categories</td><td style="${TD}">${tagStd}</td><td style="${TD}">FDA / ICH definitions</td></tr>
-     <tr><td style="${TD}">AE axis = ROR of serious outcomes</td><td style="${TD}">${tagStd}</td><td style="${TD}">EMA / MHRA signal metric, from openFDA FAERS with 95% CI</td></tr>
+     <tr><td style="${TD}">AE axis = ROR of serious outcomes</td><td style="${TD}">${tagStd}</td><td style="${TD}">EMA / MHRA signal metric, 95% CI</td></tr>
      <tr><td style="${TD}">Four-factor composite + weights (30/25/25/20)</td><td style="${TD}">${tagOurs}</td><td style="${TD}">Editorial design, versioned</td></tr>
      <tr><td style="${TD}">ROR→0–100 mapping &amp; band cut-offs</td><td style="${TD}">${tagOurs}</td><td style="${TD}">Editorial judgement, versioned</td></tr>
     </tbody></table></div></div>
-
   <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:12px">
    <div style="${PANEL}"><h3 style="${H3}">Sources — legal</h3><div style="display:flex;flex-wrap:wrap;gap:7px">${m('legal')}</div></div>
    <div style="${PANEL}"><h3 style="${H3}">Sources — medical</h3><div style="display:flex;flex-wrap:wrap;gap:7px">${m('medical')}</div></div></div>
-
   <div style="${WARN};margin-top:16px"><b>Not medical or legal advice.</b> A public-records aggregator and navigation aid; a lawsuit is an allegation, not proof of harm. AE severity comes from openFDA FAERS (withdrawn drugs with sparse reports stay EST). Do not start, stop or change any medication based on this page — talk to your prescriber.</div>`;
 }
 
 /* ============ palette ============ */
 let palOpen=false, palQ="", palSel=0, palFlat=[];
-function omniMatch(q){const t=q.trim().toLowerCase(),has=s=>!t||s.toLowerCase().includes(t);
- return {dr:DRUGS.filter(d=>has(d.br+' '+d.nm+' '+d.ty+' '+d.mf)),
-  mf:Object.values(MANS).filter(m=>has(m.name)),
-  md:Object.values(MDLS).filter(m=>has(m.docket+' '+m.drugs.map(d=>d.br).join(' ')+' '+m.court)),
-  sr:SOURCES.filter(x=>has(x.nm+' '+x.cat))};}
+function omniMatch(q){const t=q.trim().toLowerCase(),has=s=>!t||String(s).toLowerCase().includes(t);
+ return {pr:PRODUCTS.filter(p=>has(p.br+' '+p.ing.inn+' '+(p.mf||'')+' '+(p.cls?p.cls.name:''))),
+  ig:Object.values(ING).filter(g=>has(g.inn)),
+  cl:Object.values(CLS).filter(c=>has(c.name)),
+  mf:Object.values(MAN).filter(m=>has(m.name)&&PRODUCTS.some(p=>p.mfs===m.slug))};}
 function renderPalette(){
  const wrap=document.getElementById('palwrap');
  if(!palOpen){wrap.innerHTML='';return;}
  const M=omniMatch(palQ);
- palFlat=[...M.dr.map(d=>'drug-'+d.s),...M.mf.map(m=>'mfr-'+m.slug),...M.md.map(m=>'mdl-'+m.id),...M.sr.map(s=>'source-'+s.s)];
+ palFlat=[...M.pr.map(p=>'product-'+p.s),...M.ig.map(g=>'ingredient-'+g.slug),...M.cl.map(c=>'class-'+c.slug),...M.mf.map(m=>'mfr-'+m.slug)];
  if(palSel>=palFlat.length)palSel=0;
  let i=-1;const row=(route,ic,main,sub)=>{i++;const idx=i;return `<div data-nav="${route}" style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:12px;cursor:pointer;background:${idx===palSel?'#fafafb':'transparent'}"><span style="width:22px;height:22px;border-radius:6px;background:#fafafb;border:1px solid rgba(17,17,20,.08);display:grid;place-items:center;font-size:10px;color:#6b6d75;flex:none">${ic}</span><span style="flex:1;min-width:0;font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(main)} <span style="color:#8a8a93;font-size:11.5px">· ${esc(sub)}</span></span></div>`;};
- const grp=(title,arr,fn)=>arr.length?`<div style="margin-bottom:12px"><div style="font-size:12.5px;color:#8a8a93;padding:0 6px 5px">${title} ${arr.length}</div>${arr.slice(0,5).map(fn).join("")}</div>`:'';
- const body=grp('Drugs',M.dr,d=>row('drug-'+d.s,'Rx',d.br,d.ty+' · '+d.mf+' · '+d.ix))
-  +grp('Manufacturers',M.mf,m=>row('mfr-'+m.slug,'Co',m.name,m.drugs.length+' drugs · avg '+m.avg))
-  +grp('MDLs / cases',M.md,m=>row('mdl-'+m.id,'§',m.docket,m.drugs.map(d=>d.br).slice(0,2).join(', ')+' · '+m.court))
-  +grp('Sources',M.sr,x=>row('source-'+x.s,'◆',x.nm,x.cat+' · '+x.acc))
-  +(palFlat.length?'':'<div style="padding:18px 12px;color:#6b6d75;font-size:13px">Not in the database. <b>Ask Assistant</b> → miss-log + LLM.</div>');
+ const grp=(title,arr,fn)=>arr.length?`<div style="margin-bottom:12px"><div style="font-size:12.5px;color:#8a8a93;padding:0 6px 5px">${title} ${arr.length}</div>${arr.slice(0,6).map(fn).join("")}</div>`:'';
+ const body=grp('Brands',M.pr,p=>row('product-'+p.s,'Rx',p.br,p.ing.inn+' · '+(p.mf||'')+' · '+(p.ix==null?'—':p.ix)))
+  +grp('Ingredients',M.ig,g=>row('ingredient-'+g.slug,'∿',g.inn,(prodByIng[g.id]||[]).length+' brands'))
+  +grp('Classes',M.cl,c=>row('class-'+c.slug,'◇',c.name,c.prods.length+' brands'))
+  +grp('Manufacturers',M.mf,m=>row('mfr-'+m.slug,'Co',m.name,PRODUCTS.filter(p=>p.mfs===m.slug).length+' products'))
+  +(palFlat.length?'':'<div style="padding:18px 12px;color:#6b6d75;font-size:13px">Not in the database yet.</div>');
  wrap.innerHTML=`<div id="palov" style="position:fixed;inset:0;z-index:50;background:rgba(236,236,240,.8);backdrop-filter:blur(3px);display:flex;align-items:flex-start;justify-content:center;padding:clamp(12px,8vh,90px) 14px">
-  <div id="palbox" style="width:100%;max-width:720px;max-height:80vh;background:#fff;border:1px solid rgba(17,17,20,.12);border-radius:20px;box-shadow:0 24px 60px -28px rgba(17,17,20,.3);overflow:hidden;display:flex;flex-direction:column">
-   <div style="display:flex;align-items:center;gap:10px;padding:13px 15px;border-bottom:1px solid rgba(17,17,20,.08)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#8a8a93" stroke-width="2"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.5-3.5"></path></svg><input id="palInput" value="${esc(palQ)}" placeholder="drug, manufacturer, MDL, source…" style="flex:1;min-width:0;border:none;background:transparent;font:inherit;font-size:16px;color:#111114;outline:none"><span id="palClose" style="color:#8a8a93;cursor:pointer;font-size:12px">esc</span></div>
-   <div style="display:flex;gap:15px;padding:9px 15px;border-bottom:1px solid rgba(17,17,20,.08);font-size:12.5px;color:#6b6d75;flex-wrap:wrap;align-items:center"><span>Drugs <b style="color:#111114">${M.dr.length}</b></span><span>Manufacturers <b style="color:#111114">${M.mf.length}</b></span><span>MDLs <b style="color:#111114">${M.md.length}</b></span><span>Sources <b style="color:#111114">${M.sr.length}</b></span><span style="margin-left:auto;border:1px solid rgba(17,17,20,.12);border-radius:7px;padding:4px 9px;cursor:pointer;color:#3b63b8">Ask Assistant</span></div>
+  <div style="width:100%;max-width:720px;max-height:80vh;background:#fff;border:1px solid rgba(17,17,20,.12);border-radius:20px;box-shadow:0 24px 60px -28px rgba(17,17,20,.3);overflow:hidden;display:flex;flex-direction:column">
+   <div style="display:flex;align-items:center;gap:10px;padding:13px 15px;border-bottom:1px solid rgba(17,17,20,.08)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#8a8a93" stroke-width="2"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.5-3.5"></path></svg><input id="palInput" value="${esc(palQ)}" placeholder="brand, ingredient, class, manufacturer…" style="flex:1;min-width:0;border:none;background:transparent;font:inherit;font-size:16px;color:#111114;outline:none"><span id="palClose" style="color:#8a8a93;cursor:pointer;font-size:12px">esc</span></div>
+   <div style="display:flex;gap:15px;padding:9px 15px;border-bottom:1px solid rgba(17,17,20,.08);font-size:12.5px;color:#6b6d75;flex-wrap:wrap"><span>Brands <b style="color:#111114">${M.pr.length}</b></span><span>Ingredients <b style="color:#111114">${M.ig.length}</b></span><span>Classes <b style="color:#111114">${M.cl.length}</b></span><span>Makers <b style="color:#111114">${M.mf.length}</b></span></div>
    <div style="overflow:auto;padding:10px 10px 6px">${body}</div>
    <div style="display:flex;gap:15px;padding:9px 15px;border-top:1px solid rgba(17,17,20,.08);font-size:11px;color:#8a8a93"><span><span style="border:1px solid rgba(17,17,20,.12);border-radius:4px;padding:1px 5px">↑↓</span> Navigate</span><span><span style="border:1px solid rgba(17,17,20,.12);border-radius:4px;padding:1px 5px">↵</span> Open</span><span><span style="border:1px solid rgba(17,17,20,.12);border-radius:4px;padding:1px 5px">esc</span> Close</span></div>
   </div></div>`;
@@ -395,31 +414,31 @@ function closePal(){palOpen=false;renderPalette();}
 /* ============ router ============ */
 function route(){
  const h=(location.hash||'#home').replace(/^#/,'')||'home';
- const page=h.startsWith('drug-')?'drug':h.startsWith('mfr-')||h.startsWith('mdl-')?'group':h.startsWith('source-')?'source':h;
  let html;
- if(page==='drug')html=pDrug(h.slice(5));
- else if(page==='group')html=pGroup(h);
- else if(page==='source')html=pSource(h.slice(7));
- else if(page==='browse')html=pBrowse();
- else if(page==='explore')html=pExplore();
- else if(page==='methodology')html=pMethod();
+ if(h.startsWith('product-'))html=pProduct(h.slice(8));
+ else if(h.startsWith('ingredient-'))html=pIngredient(h.slice(11));
+ else if(h.startsWith('class-'))html=pClass(h.slice(6));
+ else if(h.startsWith('mfr-'))html=pMfr(h.slice(4));
+ else if(h.startsWith('source-'))html=pSource(h.slice(7));
+ else if(h==='browse')html=pBrowse();
+ else if(h==='explore')html=pExplore();
+ else if(h==='methodology')html=pMethod();
  else html=pHome();
  document.getElementById('stage').innerHTML=html;
+ const page=h.split('-')[0];
  const nav=[['Browse','browse'],['Explore','explore'],['Methodology','methodology']];
- document.getElementById('nav').innerHTML=nav.map(([l,r])=>`<a href="#${r}" style="font-size:15px;color:${page===r?'#3b63b8':'#111114'};background:${page===r?'#eef0fb':'transparent'};padding:8px 14px;border-radius:999px;white-space:nowrap">${l}</a>`).join("");
+ document.getElementById('nav').innerHTML=nav.map(([l,r])=>`<a href="#${r}" style="font-size:15px;color:${h===r?'#3b63b8':'#111114'};background:${h===r?'#eef0fb':'transparent'};padding:8px 14px;border-radius:999px;white-space:nowrap">${l}</a>`).join("");
  const hs=document.getElementById('heroSearch'); if(hs)hs.addEventListener('click',()=>openPal());
  hydrateImages();
  window.scrollTo(0,0);
 }
 
-/* delegated actions */
 document.addEventListener('click',e=>{
  const navEl=e.target.closest('[data-nav]'); if(navEl){closePal();location.hash='#'+navEl.getAttribute('data-nav');return;}
  const a=e.target.closest('[data-act]'); if(!a)return;
  const act=a.getAttribute('data-act');
- if(act.startsWith('type:')){FILTERS={ty:[act.slice(5)],mf:[],bd:[],st:[]};location.hash='#browse';if((location.hash||'')==='#browse')route();}
- else if(act.startsWith('facet:')){const [,k,v]=act.split(':');const arr=FILTERS[k];FILTERS[k]=arr.includes(v)?arr.filter(x=>x!==v):[...arr,v];route();}
- else if(act==='clearf'){FILTERS={ty:[],mf:[],bd:[],st:[]};route();}
+ if(act.startsWith('facet:')){const idx=act.indexOf(':');const rest=act.slice(idx+1);const k=rest.slice(0,rest.indexOf(':'));const v=rest.slice(rest.indexOf(':')+1);const arr=FILTERS[k];FILTERS[k]=arr.includes(v)?arr.filter(x=>x!==v):[...arr,v];route();}
+ else if(act==='clearf'){FILTERS={cls:[],mf:[],bd:[]};route();}
  else if(act.startsWith('sort:')){const k=act.slice(5);SORT.d=SORT.k===k?-SORT.d:-1;SORT.k=k;route();}
 });
 document.getElementById('openPal').addEventListener('click',()=>openPal());
@@ -433,7 +452,6 @@ window.addEventListener('keydown',e=>{
  else if(e.key==='Enter'&&palFlat[palSel]){closePal();location.hash='#'+palFlat[palSel];}
 });
 
-/* ============ boot ============ */
 loadData().then(route).catch(err=>{
  document.getElementById('stage').innerHTML=`<div style="padding:60px 20px;text-align:center"><div style="font-size:18px;font-weight:500;margin-bottom:8px">Couldn't load live data</div><div style="color:#8a8a93;font-size:13px">${esc(err.message||err)}</div></div>`;
 });

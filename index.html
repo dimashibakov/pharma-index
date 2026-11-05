@@ -1,0 +1,347 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Drug Litigation Index — current and completed lawsuits, FDA notices and a transparent Litigation Signal Index per drug. Public-records aggregator; not medical or legal advice.">
+<meta name="robots" content="noindex">
+<title>Drug Litigation Index</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Funnel+Display:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box} html,body{margin:0;background:#ececf0}
+body{color:#111114;font-family:'Funnel Display',system-ui,sans-serif;line-height:1.5;-webkit-font-smoothing:antialiased}
+a{color:#111114;text-decoration:none} a:hover{color:#3b63b8}
+input::placeholder{color:#8a8a93}
+.wrapcol{min-height:100vh;display:flex;flex-direction:column}
+kbd{font-family:inherit}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrapcol">
+
+<div style="position:sticky;top:0;z-index:20;padding:14px 24px;background:linear-gradient(180deg,rgba(236,236,240,.96) 0%,rgba(236,236,240,0) 100%)">
+  <header style="max-width:1240px;margin:0 auto;display:flex;align-items:center;gap:24px;padding:10px 10px 10px 28px;background:#fff;border:1px solid rgba(17,17,20,.08);border-radius:999px;box-shadow:0 12px 32px -22px rgba(17,17,20,.3);min-height:66px;flex-wrap:wrap">
+    <a href="#home" style="display:flex;align-items:center;gap:14px;flex:none">
+      <img src="/assets/zenlo-logo-black.png" alt="Zenlo" style="display:block;height:24px;width:auto">
+      <span style="width:1px;height:20px;background:rgba(17,17,20,.15)"></span>
+      <span style="font-size:16px;font-weight:500;white-space:nowrap">Drug Litigation Index</span>
+    </a>
+    <nav id="nav" style="display:flex;gap:6px;flex:1;min-width:0;margin-left:8px"></nav>
+    <button id="openPal" style="display:flex;align-items:center;gap:10px;font-family:inherit;font-size:14px;color:#33353c;background:#f5f5f6;border:0;border-radius:999px;padding:12px 18px;cursor:pointer;white-space:nowrap">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.5-3.5"></path></svg>Search <kbd style="font-size:11.5px;border:1px solid rgba(17,17,20,.12);border-radius:6px;padding:0 6px;color:#8a8a93;background:#fff">⌘K</kbd>
+    </button>
+  </header>
+</div>
+
+<main style="flex:1;width:100%;max-width:1288px;margin:0 auto;padding:8px 24px 24px">
+  <div style="background:#f5f5f6;border-radius:32px;padding:clamp(24px,4vw,48px)" id="stage">
+    <div style="padding:80px 20px;text-align:center;color:#8a8a93;font-size:15px">Loading live data…</div>
+  </div>
+</main>
+
+<footer style="color:#6b6d75;font-size:12.5px;line-height:1.6;text-align:center;padding:8px 24px 32px">Prototype · public-record aggregator · <b>not medical or legal advice</b> · a lawsuit is an allegation, not proof · figures current to Jul–Nov 2026.</footer>
+</div>
+<div id="palwrap"></div>
+
+<script>
+/* ============ config ============ */
+const SB_URL="https://pbzkpsrmsvapyjbdatdr.supabase.co";
+const SB_KEY="sb_publishable_WdaqO2t-ee-mva7Yegl9ew_do06lVfA";
+
+/* ============ design tokens / helpers ============ */
+const TIER={Low:['#16794a','#e7f5ee','#bfe5cf','#4fb985'],Moderate:['#2f3fbf','#eef0fb','#cfd5f6','#6f84e6'],Elevated:['#8a5a00','#faf1de','#efd59c','#d9a23c'],High:['#b42318','#fdecea','#f6c9c5','#e5534b'],None:['#4a4b55','#f1f0f5','#dedde6','#b9b8c4']};
+const GBARS=['#4fb985','#6f84e6','#d9a23c','#e5534b'];
+const gArc=(a0,a1)=>{const P=a=>{const t=a*Math.PI/180;return (30+24*Math.cos(t)).toFixed(2)+' '+(32-24*Math.sin(t)).toFixed(2);};return 'M '+P(a0)+' A 24 24 0 0 1 '+P(a1);};
+const GSEG=[[174,140],[129,96],[84,51],[40,6]];
+const gaugeSegs=b=>{const n=['Low','Moderate','Elevated','High'].indexOf(b)+1;return GSEG.map((s,i)=>({d:gArc(s[0],s[1]),c:i<n?GBARS[i]:'#ecebf1'}));};
+const bandOf=v=>v<25?'Low':v<50?'Moderate':v<75?'Elevated':'High';
+const ST={active:'Active',winding:'Winding down',closed:'Closed',mixed:'Mixed',none:'No litigation'};
+const ACC={available:['#16794a','#e7f5ee','#bfe5cf'],limited:['#8a5a00','#faf1de','#efd59c'],paid:['#4a4b55','#f1f0f5','#dedde6']};
+const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const slugify=s=>String(s||'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
+const PANEL="border:1px solid rgba(17,17,20,.08);border-radius:16px;padding:24px;background:#fff";
+const H3="margin:0 0 11px;font-size:18px;font-weight:500;letter-spacing:-0.01em;color:#111114";
+const CHIP="font-size:13px;border:1px solid rgba(17,17,20,.12);background:#fff;border-radius:999px;padding:6px 13px;white-space:nowrap;color:#33353c;cursor:pointer";
+
+function gauge(bd,ix,w,h,num){const segs=gaugeSegs(bd).map(s=>`<path d="${s.d}" stroke="${s.c}" stroke-width="${num>40?5:6}" stroke-linecap="round"></path>`).join("");
+ return `<span style="position:relative;display:block;width:${w}px;height:${h}px;flex:none"><svg width="${w}" height="${h}" viewBox="0 0 60 36" fill="none" style="position:absolute;inset:0">${segs}</svg><span style="position:absolute;left:0;right:0;bottom:0;text-align:center;font-size:${num}px;font-weight:500;letter-spacing:-0.02em;line-height:1;font-variant-numeric:tabular-nums;color:#111114">${ix}</span></span>`;}
+function drugCard(d){return `<a href="#drug-${d.s}" style="display:block;border:1px solid rgba(17,17,20,.08);border-radius:16px;padding:18px 20px;background:#fff;color:inherit">
+  <div style="font-size:16px;font-weight:500;letter-spacing:-0.01em">${esc(d.br)}</div>
+  <div style="font-size:11.5px;color:#8a8a93;margin-top:2px">${esc(d.ty)} · ${esc(d.mf)}</div>
+  <div style="display:flex;flex-direction:column;align-items:flex-start;gap:4px;margin-top:14px">${gauge(d.bd,d.ix,72,44,19)}<span style="font-size:12.5px;color:${TIER[d.bd][0]};width:72px;text-align:center">${d.bd}</span></div></a>`;}
+
+/* ============ data load + assembly ============ */
+let DRUGS=[], MANS={}, MDLS={}, SOURCES=[], DBYID={};
+async function loadData(){
+ const H={apikey:SB_KEY,Authorization:'Bearer '+SB_KEY};
+ const get=t=>fetch(SB_URL+'/rest/v1/'+t,{headers:H}).then(r=>{if(!r.ok)throw new Error(t.split('?')[0]+' '+r.status);return r.json();});
+ const [drugs,comps,lits,mans,dm,ld,srcs]=await Promise.all([
+  get('drugs?select=id,slug,name,brands,drug_type,manufacturer,manufacturer_primary,status,signal_index,band,confidence,fda_summary,boxed_warning&order=signal_index.desc'),
+  get('signal_components?select=drug_id,position,name,weight,score,value,is_estimated&order=drug_id,position'),
+  get('litigation?select=id,drug_id,docket,court,injuries,pending,status,is_excluded&order=id'),
+  get('manufacturers?select=id,slug,name,status,org_type,note'),
+  get('drug_manufacturers?select=drug_id,manufacturer_id,role,valid_from,valid_to'),
+  get('litigation_defendants?select=litigation_id,manufacturer_id,defendant_name,note'),
+  get('data_sources?select=name,category,access,notes,coverage')
+ ]);
+ const manById=Object.fromEntries(mans.map(m=>[m.id,m]));
+ const by=(arr,k)=>{const o={};arr.forEach(x=>(o[x[k]]=o[x[k]]||[]).push(x));return o;};
+ const compBy=by(comps,'drug_id'), litBy=by(lits,'drug_id'), dmBy=by(dm,'drug_id'), ldBy=by(ld,'litigation_id');
+ DRUGS=drugs.map(r=>{
+   const cs=(compBy[r.id]||[]).slice().sort((a,b)=>a.position-b.position);
+   const g=(i,f)=>cs[i]?cs[i][f]:null;
+   const cp=[g(0,'score'),g(0,'value')||'',g(1,'score'),g(1,'value')||'',g(2,'score'),g(2,'value')||'',cs[2]&&cs[2].is_estimated?1:0,g(3,'score'),g(3,'value')||''];
+   const myl=(litBy[r.id]||[]); const prim=myl.find(l=>!l.is_excluded)||myl[0]||{};
+   const mdl={d:prim.docket||'no MDL',id:((prim.docket||'').match(/\d{3,4}/)||[''])[0],court:prim.court||'—',st:prim.status||r.status,inj:prim.injuries||'—',pend:prim.pending||'—'};
+   const dms=(dmBy[r.id]||[]); const cur=dms.find(x=>x.role==='current_manufacturer');
+   const curMan=cur?manById[cur.manufacturer_id]:null;
+   const mf=curMan?curMan.name:(r.manufacturer_primary||r.manufacturer||'—');
+   const mfs=curMan?curMan.slug:slugify(mf);
+   const former=dms.filter(x=>x.role==='former_manufacturer'||x.role==='originator').map(x=>({name:(manById[x.manufacturer_id]||{}).name||'—',to:x.valid_to}));
+   const defs=[]; myl.forEach(l=>(ldBy[l.id]||[]).forEach(x=>{const nm=x.manufacturer_id?(manById[x.manufacturer_id]||{}).name:x.defendant_name;if(nm&&!defs.includes(nm))defs.push(nm);}));
+   return {id:r.id,s:r.slug,nm:r.name,br:r.brands,ty:r.drug_type,mf,mfs,ix:r.signal_index,bd:r.band,st:r.status,conf:r.confidence,fda:r.fda_summary,boxed:r.boxed_warning,cp,mdl,former,defs,curType:curMan?curMan.org_type:null,curNote:curMan?curMan.note:null};
+ });
+ DBYID=Object.fromEntries(DRUGS.map(d=>[d.id,d]));
+ MANS={}; DRUGS.forEach(d=>{(MANS[d.mfs]=MANS[d.mfs]||{slug:d.mfs,name:d.mf,drugs:[]}).drugs.push(d);});
+ Object.values(MANS).forEach(m=>m.avg=Math.round(m.drugs.reduce((a,d)=>a+d.ix,0)/m.drugs.length));
+ MDLS={}; lits.forEach(l=>{const id=((l.docket||'').match(/\d{3,4}/)||[''])[0]; if(id&&!l.is_excluded){const M=MDLS[id]=MDLS[id]||{id,docket:l.docket,court:l.court,inj:l.injuries,st:l.status,pend:l.pending,drugs:[]}; const dd=DBYID[l.drug_id]; if(dd&&!M.drugs.includes(dd))M.drugs.push(dd);}});
+ SOURCES=srcs.map(x=>({s:slugify(x.name),nm:x.name,cat:x.category,acc:x.access,note:x.notes||x.coverage||''}));
+}
+const bySlug=s=>DRUGS.find(d=>d.s===s);
+const srcBySlug=s=>SOURCES.find(x=>x.s===s);
+
+/* ============ pages ============ */
+function pHome(){
+ const top=[...DRUGS].sort((a,b)=>b.ix-a.ix).slice(0,6);
+ const types=[...new Set(DRUGS.map(d=>d.ty))];
+ const popular=['ozempic','zantac','tylenol','oxycontin'].map(bySlug).filter(Boolean);
+ const legend=[['Low','#4fb985'],['Moderate','#6f84e6'],['Elevated','#d9a23c'],['High','#e5534b']];
+ return `<div style="display:flex;flex-direction:column">
+  <div style="position:relative;overflow:hidden;border-radius:32px;margin:calc(-1 * clamp(24px,4vw,48px)) calc(-1 * clamp(24px,4vw,48px)) 0;min-height:clamp(440px,42vw,560px);display:flex;align-items:center;background:#e6e7ec">
+   <div style="position:relative;width:100%;padding:clamp(24px,4vw,48px);container-type:inline-size">
+    <h1 style="font-size:min(92px,7cqi);line-height:1;font-weight:500;letter-spacing:-0.04em;margin:0 0 32px"><span style="display:block">What's known about a drug's</span><span style="display:block">litigation history</span></h1>
+    <div id="heroSearch" style="display:flex;align-items:center;gap:14px;width:100%;background:#fff;border:2px solid #fff;border-radius:22px;padding:10px 10px 10px 26px;cursor:text;box-shadow:0 28px 60px -24px rgba(59,99,184,.45),0 2px 6px rgba(17,17,20,.06)">
+     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#3b63b8" stroke-width="2.2" style="flex:none"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.5-3.5"></path></svg>
+     <input readonly placeholder="Search a drug, manufacturer or MDL — e.g. Ozempic" style="flex:1;min-width:0;border:0;outline:none;background:transparent;font-family:inherit;font-size:clamp(17px,1.6vw,20px);color:#111114;padding:14px 0;cursor:text">
+     <span style="flex:none;display:inline-flex;align-items:center;gap:10px;font-size:16px;font-weight:500;padding:16px 28px;border-radius:14px;background:#3b63b8;color:#fff">Search<kbd style="font-size:12px;border:1px solid rgba(255,255,255,.4);border-radius:6px;padding:0 6px;color:#fff">⌘K</kbd></span>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:16px;font-size:13.5px;color:#33353c">
+     <span style="color:#6b6d75">Popular:</span>
+     ${popular.map(d=>`<a href="#drug-${d.s}" style="padding:6px 13px;border-radius:999px;background:rgba(255,255,255,.85);border:1px solid rgba(17,17,20,.08);white-space:nowrap;color:inherit">${esc(d.br.split(' /')[0])}</a>`).join("")}
+    </div>
+    <p style="color:#6b6d75;font-size:14px;line-height:1.5;margin:24px 0 0;max-width:60ch">Search any drug: current and completed lawsuits, FDA regulatory notices, and a transparent Litigation Signal Index. A public-records aggregator — not medical or legal advice.</p>
+   </div>
+  </div>
+  <div style="display:flex;justify-content:center;gap:14px;flex-wrap:wrap;margin-top:24px;font-size:12px;color:#6b6d75">
+   ${legend.map(l=>`<span style="display:inline-flex;align-items:center;gap:6px"><span style="width:8px;height:8px;border-radius:50%;background:${l[1]}"></span>${l[0]}</span>`).join("")}
+  </div>
+  <div style="margin-top:22px"><div style="font-size:13px;color:#8a8a93;margin-bottom:8px">Highest signal</div>
+   <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(168px,1fr));gap:11px">${top.map(drugCard).join("")}</div></div>
+  <div style="margin-top:20px"><div style="font-size:13px;color:#8a8a93;margin-bottom:8px">Browse by type</div>
+   <div style="display:flex;gap:7px;flex-wrap:wrap">${types.map(t=>`<span data-act="type:${esc(t)}" style="${CHIP}">${esc(t)}</span>`).join("")}</div></div>
+  <div style="background:#faf1de;border:1px solid #efd59c;border-radius:16px;padding:14px 16px;margin-top:20px"><p style="margin:0;font-size:12.5px;color:#8a5a00"><b>Note:</b> the index reflects legal and reporting activity, not proven clinical danger. High means “worth attention,” not “unsafe”; low is not a safety guarantee.</p></div>
+ </div>`;
+}
+
+let FILTERS={ty:[],mf:[],bd:[],st:[]};
+function pBrowse(){
+ const cnt=(k,val)=>DRUGS.filter(d=>d[k]===val).length;
+ const types=[...new Set(DRUGS.map(d=>d.ty))], mfs=[...new Set(DRUGS.map(d=>d.mf))];
+ const grp=(title,k,vals,lab)=>`<div><div style="font-size:13px;color:#8a8a93;margin-bottom:8px">${title}</div>${vals.map(val=>{const on=FILTERS[k].includes(val);return `<div data-act="facet:${k}:${esc(val)}" style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:${on?'#111114':'#6b6d75'};padding:3px 0;cursor:pointer;user-select:none"><span style="width:13px;height:13px;border:1px solid ${on?'#3b63b8':'rgba(17,17,20,.12)'};background:${on?'#3b63b8':'#fff'};border-radius:3px;flex:none"></span>${esc(lab?lab[val]:val)}<span style="margin-left:auto;font-size:11px;color:#8a8a93;font-family:ui-monospace,monospace">${cnt(k,val)}</span></div>`;}).join("")}</div>`;
+ const side=`<div style="flex:0 0 210px;max-width:100%;display:flex;flex-direction:column;gap:15px">${grp('Drug type','ty',types)}${grp('Manufacturer','mf',mfs)}${grp('Band','bd',['Low','Moderate','Elevated','High'])}${grp('Status','st',['active','winding','closed','none'],ST)}</div>`;
+ const has=Object.values(FILTERS).some(a=>a.length);
+ const list=DRUGS.filter(d=>['ty','mf','bd','st'].every(k=>!FILTERS[k].length||FILTERS[k].includes(d[k]))).sort((a,b)=>b.ix-a.ix);
+ const main=`<div style="flex:1 1 420px;min-width:0"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:11px;min-height:28px"><div style="font-size:13px;color:#8a8a93">${list.length} drugs${has?' · filtered':''}</div>${has?'<span data-act="clearf" style="'+CHIP+'">Clear filters</span>':''}</div><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:11px">${list.map(drugCard).join("")}</div>${list.length?'':'<div style="color:#6b6d75;font-size:13px">Nothing matches the filter.</div>'}</div>`;
+ return `<div style="display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start">${side}${main}</div>`;
+}
+
+let SORT={k:'ix',d:-1};
+function pExplore(){
+ const heads=[['br','Drug'],['ty','Type'],['mf','Manufacturer'],['ix','Index'],['bd','Band'],['st','Status']];
+ const rows=[...DRUGS].sort((a,b)=>{const x=a[SORT.k],y=b[SORT.k];return (x<y?-1:x>y?1:0)*SORT.d;});
+ const th=heads.map(([k,l])=>`<th data-act="sort:${k}" style="text-align:left;padding:14px 20px;border-bottom:1px solid rgba(17,17,20,.06);background:#fafafb;color:${SORT.k===k?'#111114':'#6b6d75'};font-weight:500;font-size:12.5px;cursor:pointer;white-space:nowrap;user-select:none">${l} <span style="color:#8a8a93">${SORT.k===k?(SORT.d<0?'↓':'↑'):'↕'}</span></th>`).join("");
+ const tb=rows.map(d=>`<tr data-nav="drug-${d.s}" style="cursor:pointer">
+   <td style="padding:14px 20px;border-bottom:1px solid rgba(17,17,20,.06)">${esc(d.br)}<div style="font-size:10.5px;color:#8a8a93">${esc(d.nm)}</div></td>
+   <td style="padding:14px 20px;border-bottom:1px solid rgba(17,17,20,.06);color:#33353c">${esc(d.ty)}</td>
+   <td style="padding:14px 20px;border-bottom:1px solid rgba(17,17,20,.06);color:#33353c">${esc(d.mf)}</td>
+   <td style="padding:10px 20px;border-bottom:1px solid rgba(17,17,20,.06)">${gauge(d.bd,d.ix,52,32,14)}</td>
+   <td style="padding:14px 20px;border-bottom:1px solid rgba(17,17,20,.06)"><span style="font-size:13.5px;color:${TIER[d.bd][0]};white-space:nowrap">${d.bd}</span></td>
+   <td style="padding:14px 20px;border-bottom:1px solid rgba(17,17,20,.06);color:#6b6d75;white-space:nowrap">${esc(ST[d.st]||d.st)}</td></tr>`).join("");
+ const agg={};DRUGS.forEach(d=>(agg[d.mf]=agg[d.mf]||[]).push(d.ix));
+ const bars=Object.entries(agg).map(([m,a])=>[m,Math.round(a.reduce((t,x)=>t+x,0)/a.length)]).sort((a,b)=>b[1]-a[1]);
+ const barsHTML=bars.map(([m,val])=>{const d=DRUGS.find(x=>x.mf===m);return `<div data-nav="mfr-${d?d.mfs:slugify(m)}" style="display:grid;grid-template-columns:minmax(90px,150px) minmax(0,1fr) 34px;gap:10px;align-items:center;margin:8px 0;font-size:12.5px;cursor:pointer"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(m)}</span><span style="display:block;height:12px;background:#ecebf1;border-radius:3px;overflow:hidden"><span style="display:block;height:100%;width:${val}%;background:${TIER[bandOf(val)][3]};border-radius:3px;opacity:.75"></span></span><span style="text-align:right;color:#6b6d75">${val}</span></div>`;}).join("");
+ return `<div style="font-size:13px;color:#8a8a93;margin-bottom:8px">Explorer</div><h1 style="font-size:clamp(30px,3.6vw,44px);line-height:1.05;font-weight:500;margin:0 0 28px;letter-spacing:-0.03em">Full cohort — sort and slice</h1>
+  <div style="overflow-x:auto;border:1px solid rgba(17,17,20,.08);border-radius:16px;background:#fff"><table style="border-collapse:collapse;width:100%;min-width:640px;font-size:13px"><thead><tr>${th}</tr></thead><tbody>${tb}</tbody></table></div>
+  <div style="${PANEL};margin-top:14px"><div style="font-size:13px;color:#8a8a93;margin-bottom:8px">Average index by manufacturer</div>${barsHTML}</div>`;
+}
+
+function pDrug(slug){
+ const d=bySlug(slug); if(!d)return `<div style="${PANEL}">Not found. <a href="#browse" style="color:#3b63b8">← back to browse</a></div>`;
+ const names=['Regulatory action','Litigation volume','AE severity','Court outcomes'],w=['30%','25%','25%','20%'];
+ const parts=[[d.cp[0],d.cp[1],false],[d.cp[2],d.cp[3],false],[d.cp[4],d.cp[5],d.cp[6]===1],[d.cp[7],d.cp[8],false]];
+ const comps=parts.map((pt,i)=>{const pend=pt[0]===null||pt[0]===undefined;const fill=pend?'repeating-linear-gradient(45deg,#b9b8c4,#b9b8c4 5px,transparent 5px,transparent 10px)':TIER[bandOf(pt[0])][3];
+   return `<div style="margin-bottom:11px"><div style="display:flex;justify-content:space-between;gap:10px;font-size:13px;margin-bottom:4px;flex-wrap:wrap"><span>${names[i]} <span style="color:#8a8a93;font-size:11px">· ${w[i]}</span></span><span style="color:#6b6d75;font-size:12px">${esc(pt[1])}${pt[2]?'<span style="font-size:11px;color:#8a5a00;background:#faf1de;border:1px solid #efd59c;border-radius:4px;padding:1px 6px;margin-left:5px;vertical-align:middle">EST</span>':''} · ${pend?'—':pt[0]}</span></div><div style="height:7px;background:#ecebf1;border-radius:99px;overflow:hidden"><div style="height:100%;width:${pend?'100%':pt[0]+'%'};background:${fill};border-radius:99px"></div></div></div>`;}).join("");
+ const hist=[[d.ix-6,'Jul'],[d.ix-3,'Sep'],[d.ix,'Nov']],hmax=Math.max(...hist.map(h=>h[0]),1);
+ const strong=d.cp[0]>=80;
+ const box=d.cp[0]>=65?`<div style="border:1px solid ${strong?'#f6c9c5':'#efd59c'};background:${strong?'#fdecea':'#faf1de'};border-radius:12px;padding:16px 18px;margin-bottom:12px"><div style="font-size:14px;font-weight:500;color:${strong?'#b42318':'#8a5a00'}">${esc((d.fda||'').split('.')[0].split(';')[0])}</div><p style="margin:6px 0 0;font-size:13px;color:#33353c">${esc(d.fda)}</p></div>`:'';
+ const related=DRUGS.filter(x=>x.ty===d.ty&&x.s!==d.s).concat(DRUGS.filter(x=>x.mf===d.mf&&x.s!==d.s)).filter((x,i,a)=>a.indexOf(x)===i).slice(0,5);
+ const psrc=SOURCES.filter(x=>['courtlistener','jpml','openfda-faers','sec-edgar'].includes(x.s));
+ const srcChips=(psrc.length?psrc:SOURCES.slice(0,4)).map(x=>`<a href="#source-${x.s}" style="${CHIP};color:#33353c">${esc(x.nm)}</a>`).join("");
+ const hasSucc=d.former.length||d.defs.length;
+ const succ=hasSucc?`<div style="${PANEL};margin-bottom:12px"><h3 style="${H3}">Manufacturer &amp; defendants</h3>
+   <div style="display:flex;gap:12px;padding:9px 0;font-size:13px"><span style="flex:0 0 140px;color:#6b6d75;font-size:12.5px">Current maker</span><span><b>${esc(d.mf)}</b>${d.curType?' <span style="color:#8a8a93">· '+esc(d.curType)+'</span>':''}</span></div>
+   ${d.former.map(f=>`<div style="display:flex;gap:12px;padding:9px 0;border-top:1px solid rgba(17,17,20,.08);font-size:13px"><span style="flex:0 0 140px;color:#6b6d75;font-size:12.5px">Former / originator</span><span>${esc(f.name)}${f.to?' <span style="color:#8a8a93">· until '+esc(f.to)+'</span>':''}</span></div>`).join("")}
+   ${d.defs.length?`<div style="display:flex;gap:12px;padding:9px 0;border-top:1px solid rgba(17,17,20,.08);font-size:13px"><span style="flex:0 0 140px;color:#6b6d75;font-size:12.5px">Litigation defendant</span><span>${esc(d.defs.join(' + '))}</span></div>`:''}
+   <p style="font-size:11.5px;color:#8a8a93;margin:9px 0 0">The signal index belongs to the drug; it does not transfer to a successor as its own liability.</p></div>`:'';
+ return `<div style="font-size:12px;color:#8a8a93;margin-bottom:14px;display:flex;gap:6px;flex-wrap:wrap"><a href="#browse" style="color:#3b63b8">Browse</a><span>/</span><span data-act="type:${esc(d.ty)}" style="color:#3b63b8;cursor:pointer">${esc(d.ty)}</span><span>/</span><span>${esc(d.br)}</span></div>
+  <div style="display:flex;flex-wrap:wrap;gap:16px;justify-content:space-between;align-items:flex-start;margin-bottom:16px">
+   <div style="min-width:0"><h1 style="margin:0;font-size:clamp(44px,6vw,80px);line-height:1;font-weight:500;letter-spacing:-0.035em">${esc(d.nm)}</h1>
+    <div style="color:#111114;font-size:clamp(19px,2vw,26px);line-height:1.3;letter-spacing:-0.015em;margin-top:18px">${esc(d.br)} · ${esc(d.ty)}</div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:11px">
+     <a href="#mfr-${d.mfs}" style="${CHIP};flex:none">${esc(d.mf)}</a>
+     ${d.mdl.id?`<a href="#mdl-${d.mdl.id}" style="${CHIP};flex:none">§ ${esc(d.mdl.d)}</a>`:`<span style="${CHIP};flex:none;cursor:default">${esc(d.mdl.d)}</span>`}
+     <span style="${CHIP};flex:none;cursor:default">${esc(ST[d.st]||d.st)}</span></div></div>
+   <div style="border:1px solid rgba(17,17,20,.08);border-radius:20px;padding:22px 28px;text-align:center;min-width:200px;background:#fff;box-shadow:0 30px 60px -40px rgba(17,17,20,.25)">
+    <div style="font-size:13px;color:#8a8a93;margin-bottom:8px">Signal index</div>
+    <div style="display:flex;flex-direction:column;align-items:center;gap:6px">${gauge(d.bd,d.ix,200,120,56)}<span style="font-size:15px;color:${TIER[d.bd][0]}">${d.bd}</span></div></div></div>
+  <div style="${PANEL};margin-bottom:12px"><h3 style="${H3}">Signal components</h3>${comps}<p style="font-size:11.5px;color:#8a8a93;margin:6px 0 0"><b>Confidence:</b> ${esc(d.conf)}. Not a safety rating or verdict.</p></div>
+  ${succ}
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:12px">
+   <div style="${PANEL};margin-bottom:12px"><h3 style="${H3}">Cases &amp; outcomes</h3>
+    <div style="display:flex;gap:12px;padding:9px 0;font-size:13px"><span style="flex:0 0 120px;color:#6b6d75;font-size:12.5px">Docket</span><span>${esc(d.mdl.d)}${d.mdl.id?' · '+esc(d.mdl.court):''}</span></div>
+    <div style="display:flex;gap:12px;padding:9px 0;border-top:1px solid rgba(17,17,20,.08);font-size:13px"><span style="flex:0 0 120px;color:#6b6d75;font-size:12.5px">Alleged injury</span><span>${esc(d.mdl.inj)}</span></div>
+    <div style="display:flex;gap:12px;padding:9px 0;border-top:1px solid rgba(17,17,20,.08);font-size:13px"><span style="flex:0 0 120px;color:#6b6d75;font-size:12.5px">Pending</span><span style="font-family:ui-monospace,monospace">${esc(d.mdl.pend)}</span></div>
+    <div style="display:flex;gap:12px;padding:9px 0;border-top:1px solid rgba(17,17,20,.08);font-size:13px"><span style="flex:0 0 120px;color:#6b6d75;font-size:12.5px">Outcome</span><span>${esc(d.cp[8])}</span></div></div>
+   <div style="${PANEL};margin-bottom:12px"><h3 style="${H3}">FDA / regulatory</h3>${box}<div style="display:flex;gap:12px;padding:9px 0;font-size:13px"><span style="flex:0 0 120px;color:#6b6d75;font-size:12.5px">Summary</span><span>${esc(d.fda)}</span></div></div></div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:12px">
+   <div style="${PANEL};margin-bottom:12px"><h3 style="${H3}">Score history (versions)</h3><div style="display:flex;gap:7px;align-items:flex-end;height:76px;padding-top:16px">${hist.map(h=>`<div style="flex:1;height:${Math.round(h[0]/hmax*100)}%;min-height:22px;background:#eef0fb;border:1px solid rgba(17,17,20,.12);border-radius:4px 4px 0 0;position:relative;display:flex;align-items:flex-end;justify-content:center"><span style="position:absolute;top:-17px;font-size:10px;color:#8a8a93">${h[1]}</span><b style="font-size:10px;color:#33353c;padding-bottom:3px">${h[0]}</b></div>`).join("")}</div><p style="font-size:11.5px;color:#8a8a93;margin:10px 0 0">Each data update writes a new index version.</p></div>
+   <div style="${PANEL};margin-bottom:12px"><h3 style="${H3}">Public API</h3><div style="color:#6b6d75;background:#fafafb;border:1px solid rgba(17,17,20,.08);border-radius:12px;padding:14px 16px;overflow-x:auto;white-space:pre;font-size:13px;line-height:1.6"><span style="color:#3b63b8">GET</span> /api/v1/drug/${esc(d.s)}
+{ "index": ${d.ix}, "band": "${esc(d.bd)}",
+  "status": "${esc(d.st)}" }</div><div style="margin-top:9px;display:flex;gap:8px"><button style="${CHIP}">JSON</button><button style="${CHIP}">CSV</button></div></div></div>
+  <div style="${PANEL};margin-bottom:12px"><h3 style="${H3}">Related</h3><div style="display:flex;flex-wrap:wrap;gap:7px">${related.map(r=>`<a href="#drug-${r.s}" style="${CHIP}">${esc(r.br)} · ${r.ix}</a>`).join("")}<a href="#mfr-${d.mfs}" style="${CHIP};color:#3b63b8">all “${esc(d.mf)}” →</a></div></div>
+  <div style="${PANEL}"><h3 style="${H3}">Sources (public records)</h3><div style="display:flex;flex-wrap:wrap;gap:7px">${srcChips}</div></div>`;
+}
+
+function pGroup(route){
+ if(route.startsWith('mfr-')){
+   const slug=route.slice(4), m=MANS[slug];
+   if(!m)return `<div style="${PANEL}">Manufacturer not found.</div>`;
+   const avg=m.avg, bd=bandOf(avg);
+   return `<div style="font-size:12px;color:#8a8a93;margin-bottom:14px;display:flex;gap:6px;flex-wrap:wrap"><a href="#browse" style="color:#3b63b8">Browse</a><span>/</span><span>Manufacturer</span><span>/</span><span>${esc(m.name)}</span></div>
+    <div style="display:flex;flex-wrap:wrap;gap:16px;justify-content:space-between;align-items:flex-start;margin-bottom:16px">
+     <div><h1 style="margin:0;font-size:clamp(44px,6vw,80px);line-height:1;font-weight:500;letter-spacing:-0.035em">${esc(m.name)}</h1><div style="color:#111114;font-size:clamp(19px,2vw,26px);line-height:1.3;letter-spacing:-0.015em;margin-top:18px">Manufacturer · ${m.drugs.length} drugs in the database</div></div>
+     <div style="border:1px solid rgba(17,17,20,.08);border-radius:20px;padding:22px 28px;text-align:center;min-width:200px;background:#fff;box-shadow:0 30px 60px -40px rgba(17,17,20,.25)"><div style="font-size:13px;color:#8a8a93;margin-bottom:8px">Avg index</div><div style="display:flex;flex-direction:column;align-items:center;gap:6px">${gauge(bd,avg,160,96,44)}<span style="font-size:14px;color:${TIER[bd][0]}">${bd}</span></div><div style="font-size:11.5px;color:#6b6d75;margin-top:6px">across ${m.drugs.length} drugs</div></div></div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:11px">${[...m.drugs].sort((a,b)=>b.ix-a.ix).map(drugCard).join("")}</div>`;
+ } else {
+   const id=route.slice(4), m=MDLS[id];
+   if(!m)return `<div style="${PANEL}">MDL not found.</div>`;
+   return `<div style="font-size:12px;color:#8a8a93;margin-bottom:14px;display:flex;gap:6px;flex-wrap:wrap"><a href="#browse" style="color:#3b63b8">Browse</a><span>/</span><span>MDL</span><span>/</span><span>${esc(m.docket)}</span></div>
+    <div style="display:flex;flex-wrap:wrap;gap:16px;justify-content:space-between;align-items:flex-start;margin-bottom:16px">
+     <div><h1 style="margin:0;font-size:clamp(44px,6vw,80px);line-height:1;font-weight:500;letter-spacing:-0.035em">${esc(m.docket)}</h1><div style="color:#111114;font-size:clamp(19px,2vw,26px);line-height:1.3;letter-spacing:-0.015em;margin-top:18px">${esc(m.court)} · ${esc(m.inj)} · status: ${esc(ST[m.st]||m.st)}</div></div>
+     <div style="border:1px solid rgba(17,17,20,.08);border-radius:20px;padding:22px 28px;text-align:center;min-width:200px;background:#fff;box-shadow:0 30px 60px -40px rgba(17,17,20,.25)"><div style="font-size:13px;color:#8a8a93;margin-bottom:8px">Pending</div><div style="font-variant-numeric:tabular-nums;font-weight:500;letter-spacing:-0.03em;font-size:40px;line-height:1.1">${esc(m.pend)}</div><div style="font-size:11.5px;color:#6b6d75;margin-top:6px">cases</div></div></div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:11px">${m.drugs.map(drugCard).join("")}</div>`;
+ }
+}
+function pSource(slug){
+ const x=srcBySlug(slug); if(!x)return `<div style="${PANEL}">Source not found.</div>`;
+ const a=ACC[x.acc]||ACC.paid;
+ return `<div style="font-size:12px;color:#8a8a93;margin-bottom:14px;display:flex;gap:6px;flex-wrap:wrap"><a href="#methodology" style="color:#3b63b8">Methodology</a><span>/</span><span>Source</span><span>/</span><span>${esc(x.nm)}</span></div>
+  <h1 style="margin:0;font-size:clamp(44px,6vw,80px);line-height:1;font-weight:500;letter-spacing:-0.035em">${esc(x.nm)}</h1>
+  <div style="display:flex;gap:6px;margin:10px 0 16px;flex-wrap:wrap"><span style="${CHIP};cursor:default">${esc(x.cat)}</span><span style="display:inline-flex;align-items:center;gap:6px;font-size:12.5px;padding:3px 9px;border-radius:4px;background:${a[1]};border:1px solid ${a[2]};color:${a[0]}"><span style="width:5px;height:5px;border-radius:50%;background:${a[0]}"></span>${esc(x.acc)}</span></div>
+  <div style="${PANEL}"><h3 style="${H3}">What it is</h3><p style="font-size:14px;color:#33353c;margin:0">${esc(x.note)}</p></div>`;
+}
+function pMethod(){
+ const m=c=>SOURCES.filter(x=>x.cat===c).map(x=>`<a href="#source-${x.s}" style="${CHIP}">${esc(x.nm)}</a>`).join("");
+ return `<div style="font-size:13px;color:#8a8a93;margin-bottom:8px">Methodology</div><h1 style="font-size:clamp(30px,3.6vw,44px);line-height:1.05;font-weight:500;margin:0 0 24px;letter-spacing:-0.03em">How the index is computed</h1>
+  <p style="font-size:clamp(19px,2vw,24px);line-height:1.35;letter-spacing:-0.015em;color:#33353c;margin:0 0 24px;max-width:46ch;text-wrap:pretty">Over 95% of pharma suits settle with no admission of liability, and case counts track sales volume more than danger. So the index is not “minus points per loss” but a weighted composite of independent signals; outcomes move the score only once cases actually resolve.</p>
+  <div style="font-size:12.5px;background:#fafafb;border:1px solid rgba(17,17,20,.08);border-radius:14px;padding:13px 15px;line-height:1.7;color:#33353c;overflow-x:auto">Index = Σ ( componentScore × weight ) over components with data<br>regulatory 30% · litigation-volume 25% · AE-severity 25% · outcomes 20%<br>outcomes pending → weight redistributed, confidence lowered</div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:12px;margin-top:14px">
+   <div style="${PANEL}"><h3 style="${H3}">Sources — legal</h3><div style="display:flex;flex-wrap:wrap;gap:7px">${m('legal')}</div></div>
+   <div style="${PANEL}"><h3 style="${H3}">Sources — medical</h3><div style="display:flex;flex-wrap:wrap;gap:7px">${m('medical')}</div></div></div>
+  <div style="background:#faf1de;border:1px solid #efd59c;border-radius:16px;padding:14px 16px;margin-top:20px"><p style="margin:0;font-size:12.5px;color:#8a5a00"><b>Not medical or legal advice.</b> A public-records aggregator. A lawsuit is an allegation, not proof of harm. AE figures are partly estimated pending the openFDA connection. Do not change a prescription based on this page — talk to your prescriber.</p></div>`;
+}
+
+/* ============ palette ============ */
+let palOpen=false, palQ="", palSel=0, palFlat=[];
+function omniMatch(q){const t=q.trim().toLowerCase(),has=s=>!t||s.toLowerCase().includes(t);
+ return {dr:DRUGS.filter(d=>has(d.br+' '+d.nm+' '+d.ty+' '+d.mf)),
+  mf:Object.values(MANS).filter(m=>has(m.name)),
+  md:Object.values(MDLS).filter(m=>has(m.docket+' '+m.drugs.map(d=>d.br).join(' ')+' '+m.court)),
+  sr:SOURCES.filter(x=>has(x.nm+' '+x.cat))};}
+function renderPalette(){
+ const wrap=document.getElementById('palwrap');
+ if(!palOpen){wrap.innerHTML='';return;}
+ const M=omniMatch(palQ);
+ palFlat=[...M.dr.map(d=>'drug-'+d.s),...M.mf.map(m=>'mfr-'+m.slug),...M.md.map(m=>'mdl-'+m.id),...M.sr.map(s=>'source-'+s.s)];
+ if(palSel>=palFlat.length)palSel=0;
+ let i=-1;const row=(route,ic,main,sub)=>{i++;const idx=i;return `<div data-nav="${route}" style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:12px;cursor:pointer;background:${idx===palSel?'#fafafb':'transparent'}"><span style="width:22px;height:22px;border-radius:6px;background:#fafafb;border:1px solid rgba(17,17,20,.08);display:grid;place-items:center;font-size:10px;color:#6b6d75;flex:none">${ic}</span><span style="flex:1;min-width:0;font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(main)} <span style="color:#8a8a93;font-size:11.5px">· ${esc(sub)}</span></span></div>`;};
+ const grp=(title,arr,fn)=>arr.length?`<div style="margin-bottom:12px"><div style="font-size:12.5px;color:#8a8a93;padding:0 6px 5px">${title} ${arr.length}</div>${arr.slice(0,5).map(fn).join("")}</div>`:'';
+ const body=grp('Drugs',M.dr,d=>row('drug-'+d.s,'Rx',d.br,d.ty+' · '+d.mf+' · '+d.ix))
+  +grp('Manufacturers',M.mf,m=>row('mfr-'+m.slug,'Co',m.name,m.drugs.length+' drugs · avg '+m.avg))
+  +grp('MDLs / cases',M.md,m=>row('mdl-'+m.id,'§',m.docket,m.drugs.map(d=>d.br).slice(0,2).join(', ')+' · '+m.court))
+  +grp('Sources',M.sr,x=>row('source-'+x.s,'◆',x.nm,x.cat+' · '+x.acc))
+  +(palFlat.length?'':'<div style="padding:18px 12px;color:#6b6d75;font-size:13px">Not in the database. <b>Ask Assistant</b> → miss-log + LLM.</div>');
+ wrap.innerHTML=`<div id="palov" style="position:fixed;inset:0;z-index:50;background:rgba(236,236,240,.8);backdrop-filter:blur(3px);display:flex;align-items:flex-start;justify-content:center;padding:clamp(12px,8vh,90px) 14px">
+  <div id="palbox" style="width:100%;max-width:720px;max-height:80vh;background:#fff;border:1px solid rgba(17,17,20,.12);border-radius:20px;box-shadow:0 24px 60px -28px rgba(17,17,20,.3);overflow:hidden;display:flex;flex-direction:column">
+   <div style="display:flex;align-items:center;gap:10px;padding:13px 15px;border-bottom:1px solid rgba(17,17,20,.08)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#8a8a93" stroke-width="2"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.5-3.5"></path></svg><input id="palInput" value="${esc(palQ)}" placeholder="drug, manufacturer, MDL, source…" style="flex:1;min-width:0;border:none;background:transparent;font:inherit;font-size:16px;color:#111114;outline:none"><span id="palClose" style="color:#8a8a93;cursor:pointer;font-size:12px">esc</span></div>
+   <div style="display:flex;gap:15px;padding:9px 15px;border-bottom:1px solid rgba(17,17,20,.08);font-size:12.5px;color:#6b6d75;flex-wrap:wrap;align-items:center"><span>Drugs <b style="color:#111114">${M.dr.length}</b></span><span>Manufacturers <b style="color:#111114">${M.mf.length}</b></span><span>MDLs <b style="color:#111114">${M.md.length}</b></span><span>Sources <b style="color:#111114">${M.sr.length}</b></span><span style="margin-left:auto;border:1px solid rgba(17,17,20,.12);border-radius:7px;padding:4px 9px;cursor:pointer;color:#3b63b8">Ask Assistant</span></div>
+   <div style="overflow:auto;padding:10px 10px 6px">${body}</div>
+   <div style="display:flex;gap:15px;padding:9px 15px;border-top:1px solid rgba(17,17,20,.08);font-size:11px;color:#8a8a93"><span><span style="border:1px solid rgba(17,17,20,.12);border-radius:4px;padding:1px 5px">↑↓</span> Navigate</span><span><span style="border:1px solid rgba(17,17,20,.12);border-radius:4px;padding:1px 5px">↵</span> Open</span><span><span style="border:1px solid rgba(17,17,20,.12);border-radius:4px;padding:1px 5px">esc</span> Close</span></div>
+  </div></div>`;
+ const inp=document.getElementById('palInput'); if(inp){inp.focus();try{inp.setSelectionRange(inp.value.length,inp.value.length);}catch(e){} inp.addEventListener('input',e=>{palQ=e.target.value;palSel=0;renderPalette();});}
+ document.getElementById('palClose').addEventListener('click',closePal);
+ document.getElementById('palov').addEventListener('click',e=>{if(e.target.id==='palov')closePal();});
+}
+function openPal(q){palOpen=true;palQ=q||'';palSel=0;renderPalette();}
+function closePal(){palOpen=false;renderPalette();}
+
+/* ============ router ============ */
+function route(){
+ const h=(location.hash||'#home').replace(/^#/,'')||'home';
+ const page=h.startsWith('drug-')?'drug':h.startsWith('mfr-')||h.startsWith('mdl-')?'group':h.startsWith('source-')?'source':h;
+ let html;
+ if(page==='drug')html=pDrug(h.slice(5));
+ else if(page==='group')html=pGroup(h);
+ else if(page==='source')html=pSource(h.slice(7));
+ else if(page==='browse')html=pBrowse();
+ else if(page==='explore')html=pExplore();
+ else if(page==='methodology')html=pMethod();
+ else html=pHome();
+ document.getElementById('stage').innerHTML=html;
+ const nav=[['Browse','browse'],['Explore','explore'],['Methodology','methodology']];
+ document.getElementById('nav').innerHTML=nav.map(([l,r])=>`<a href="#${r}" style="font-size:15px;color:${page===r?'#3b63b8':'#111114'};background:${page===r?'#eef0fb':'transparent'};padding:8px 14px;border-radius:999px;white-space:nowrap">${l}</a>`).join("");
+ const hs=document.getElementById('heroSearch'); if(hs)hs.addEventListener('click',()=>openPal());
+ window.scrollTo(0,0);
+}
+
+/* delegated actions */
+document.addEventListener('click',e=>{
+ const navEl=e.target.closest('[data-nav]'); if(navEl){closePal();location.hash='#'+navEl.getAttribute('data-nav');return;}
+ const a=e.target.closest('[data-act]'); if(!a)return;
+ const act=a.getAttribute('data-act');
+ if(act.startsWith('type:')){FILTERS={ty:[act.slice(5)],mf:[],bd:[],st:[]};location.hash='#browse';if((location.hash||'')==='#browse')route();}
+ else if(act.startsWith('facet:')){const [,k,v]=act.split(':');const arr=FILTERS[k];FILTERS[k]=arr.includes(v)?arr.filter(x=>x!==v):[...arr,v];route();}
+ else if(act==='clearf'){FILTERS={ty:[],mf:[],bd:[],st:[]};route();}
+ else if(act.startsWith('sort:')){const k=act.slice(5);SORT.d=SORT.k===k?-SORT.d:-1;SORT.k=k;route();}
+});
+document.getElementById('openPal').addEventListener('click',()=>openPal());
+window.addEventListener('hashchange',route);
+window.addEventListener('keydown',e=>{
+ if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='k'){e.preventDefault();openPal();return;}
+ if(!palOpen)return;
+ if(e.key==='Escape')closePal();
+ else if(e.key==='ArrowDown'){e.preventDefault();palSel=Math.min(palSel+1,palFlat.length-1);renderPalette();}
+ else if(e.key==='ArrowUp'){e.preventDefault();palSel=Math.max(palSel-1,0);renderPalette();}
+ else if(e.key==='Enter'&&palFlat[palSel]){closePal();location.hash='#'+palFlat[palSel];}
+});
+
+/* ============ boot ============ */
+loadData().then(route).catch(err=>{
+ document.getElementById('stage').innerHTML=`<div style="padding:60px 20px;text-align:center"><div style="font-size:18px;font-weight:500;margin-bottom:8px">Couldn't load live data</div><div style="color:#8a8a93;font-size:13px">${esc(err.message||err)}</div></div>`;
+});
+</script>
+</body>
+</html>

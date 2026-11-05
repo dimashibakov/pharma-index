@@ -117,7 +117,7 @@ const srcBySlug=s=>SOURCES.find(x=>x.s===s);
 function pHome(){
  const top=[...DRUGS].sort((a,b)=>b.ix-a.ix).slice(0,6);
  const types=[...new Set(DRUGS.map(d=>d.ty))];
- const popular=['ozempic','zantac','tylenol','oxycontin'].map(bySlug).filter(Boolean);
+ const popular=['semaglutide','ranitidine','acetaminophen','oxycodone'].map(bySlug).filter(Boolean);
  const legend=[['Low','#4fb985'],['Moderate','#6f84e6'],['Elevated','#d9a23c'],['High','#e5534b']];
  return `<div style="display:flex;flex-direction:column">
   <div style="position:relative;overflow:hidden;border-radius:32px;margin:calc(-1 * clamp(24px,4vw,48px)) calc(-1 * clamp(24px,4vw,48px)) 0;min-height:clamp(440px,42vw,560px);display:flex;align-items:center;background:#e6e7ec">

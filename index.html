@@ -317,28 +317,28 @@ function pMethod(){
     </tbody></table></div>
    <p style="color:#6b6d75;font-size:12.5px;margin:12px 0 0"><b>On the weights:</b> 30/25/25/20 is our editorial judgement (v1), not a figure from a study. We publish and version it — this is the part that is a choice, not a standard.</p></div>
 
-  <div style="${PANEL};margin-bottom:12px"><div style="${EB}">Inside the AE-severity factor</div><h3 style="${H3}">How “severity” becomes a number</h3>
-   <p style="font-size:14px;color:#33353c;margin:0 0 10px">We query openFDA FAERS for total reports and how many carry each <b>serious</b> outcome. The definition of “serious” is the regulator's; the weighting of them is ours:</p>
-   <div style="${BOX};font-family:ui-monospace,monospace;font-size:12.5px;line-height:1.8;margin-bottom:12px">severity_rate = ( 1.0·death + 0.9·congenital + 0.8·life-threatening + 0.5·disabling + 0.4·hospitalization ) ÷ total_reports<br>AE_score = round( severity_rate × 100 ), capped 0–100</div>
-   <p style="font-size:13px;color:#6b6d75;margin:0 0 12px">Drugs with fewer than 50 reports are left marked EST rather than scored on noise.</p>
-   <div style="${WARN}"><b>Where recognised standards sit.</b> FDA, WHO and EMA publish no single “danger score” per drug. They use disproportionality methods for one drug–event pair at a time — PRR, ROR, IC/BCPNN (WHO Uppsala), EBGM/MGPS (FDA). Our planned next step re-bases this factor on one of those (likely ROR or EBGM) so the pharmacovigilance axis rests on a citable standard.</div></div>
+  <div style="${PANEL};margin-bottom:12px"><div style="${EB}">Inside the AE-severity factor</div><h3 style="${H3}">A standard signal metric — not our own weighting</h3>
+   <p style="font-size:14px;color:#33353c;margin:0 0 10px">This factor is the <b>Reporting Odds Ratio (ROR)</b> for serious outcomes — the signal-detection metric used by the EMA and MHRA. From openFDA FAERS we build the 2×2 table of the drug versus every other drug, serious vs non-serious reports:</p>
+   <div style="${BOX};font-family:ui-monospace,monospace;font-size:12.5px;line-height:1.8;margin-bottom:12px">ROR = (a·d) / (b·c)   —  a,b = the drug's serious / non-serious reports;  c,d = all other drugs'<br>95% CI = exp( ln ROR ± 1.96·√(1/a+1/b+1/c+1/d) )<br>AE_score = 100 × ( 1 − 1 / ROR_lower95 ),  capped 0–100</div>
+   <p style="font-size:13px;color:#6b6d75;margin:0 0 12px">ROR &gt; 1 means the drug's reports skew more serious than the average FAERS drug. We score off the conservative lower 95% bound, so small / under-powered samples pull toward 0; drugs with fewer than 50 reports stay marked EST.</p>
+   <div style="${WARN}"><b>Why ROR.</b> FDA, WHO and EMA publish no single “danger score” per drug — they use disproportionality metrics one drug–event pair at a time: PRR, ROR, IC/BCPNN (WHO Uppsala), EBGM/MGPS (FDA). We use ROR (exact from public counts, with a confidence interval). EBGM — FDA's Bayesian-shrinkage method, sturdier on small counts — is a planned refinement.</div></div>
 
   <div style="${PANEL};margin-bottom:12px;border-color:#cfd5f6"><div style="${EB};color:#2f3fbf">Worked example · fictional</div><h3 style="${H3}">Veltraxa (velcarbide) — Caldwell Therapeutics</h3>
    <p style="font-size:13px;color:#6b6d75;margin:0 0 14px">A made-up drug and company, only to show the arithmetic.</p>
    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr));gap:10px;margin-bottom:14px">
     <div style="${BOX}"><div style="${EB}">① Regulatory</div><div style="font-size:13px">1 FDA safety comm. (2025) + label warning; no boxed warning. <b>→ 60</b></div></div>
     <div style="${BOX}"><div style="${EB}">② Litigation volume</div><div style="font-size:13px">MDL, ~1,200 cases; normalized to ≈2M patient-years. <b>→ 55</b></div></div>
-    <div style="${BOX}"><div style="${EB}">③ AE severity (FAERS)</div><div style="font-size:13px">12,400 reports · 10% death · 40% hosp · … <span style="font-family:ui-monospace,monospace;font-size:12px">→ .367</span> <b>→ 37</b></div></div>
+    <div style="${BOX}"><div style="${EB}">③ AE severity (FAERS ROR)</div><div style="font-size:13px">12,400 reports; ROR 2.0 (95% CI 2.0–2.1) for serious outcomes. <span style="font-family:ui-monospace,monospace;font-size:12px">100×(1−1/2.0)</span> <b>→ 50</b></div></div>
     <div style="${BOX}"><div style="${EB}">④ Court outcomes</div><div style="font-size:13px">2 bellwethers (1 plaintiff, 1 defense); no global settlement. <b>→ 50</b></div></div>
    </div>
    <div style="${BOX};font-size:13px;font-family:ui-monospace,monospace;line-height:1.9">
     <div style="display:flex;justify-content:space-between;color:#6b6d75"><span>Regulatory 60 × 0.30</span><span>= 18.00</span></div>
     <div style="display:flex;justify-content:space-between;color:#6b6d75"><span>Litigation 55 × 0.25</span><span>= 13.75</span></div>
-    <div style="display:flex;justify-content:space-between;color:#6b6d75"><span>AE severity 37 × 0.25</span><span>= 9.25</span></div>
+    <div style="display:flex;justify-content:space-between;color:#6b6d75"><span>AE severity 50 × 0.25</span><span>= 12.50</span></div>
     <div style="display:flex;justify-content:space-between;color:#6b6d75"><span>Outcomes 50 × 0.20</span><span>= 10.00</span></div>
-    <div style="display:flex;justify-content:space-between;border-top:1px solid rgba(17,17,20,.15);margin-top:6px;padding-top:6px;font-weight:600"><span>Index = Σ</span><span>51.0</span></div></div>
-   <div style="display:flex;align-items:center;gap:12px;margin-top:12px"><span style="font-size:32px;font-weight:500;letter-spacing:-0.03em;font-variant-numeric:tabular-nums">51</span><span style="font-size:13.5px;color:#d9a23c;border:1px solid #efd59c;background:#faf1de;border-radius:999px;padding:4px 12px">Elevated (50–74)</span></div>
-   <div style="${BOX};border-style:dashed;margin-top:14px"><div style="${EB}">If outcomes were still pending</div><div style="font-size:13px">Drop ④, rescale the rest (÷0.80): <span style="font-family:ui-monospace,monospace;font-size:12.5px">0.375·60 + 0.3125·55 + 0.3125·37 = 51.25 → 51</span> — same ballpark, shown with <b>lower confidence</b>. We never invent an outcome score.</div></div></div>
+    <div style="display:flex;justify-content:space-between;border-top:1px solid rgba(17,17,20,.15);margin-top:6px;padding-top:6px;font-weight:600"><span>Index = Σ</span><span>54.25</span></div></div>
+   <div style="display:flex;align-items:center;gap:12px;margin-top:12px"><span style="font-size:32px;font-weight:500;letter-spacing:-0.03em;font-variant-numeric:tabular-nums">54</span><span style="font-size:13.5px;color:#d9a23c;border:1px solid #efd59c;background:#faf1de;border-radius:999px;padding:4px 12px">Elevated (50–74)</span></div>
+   <div style="${BOX};border-style:dashed;margin-top:14px"><div style="${EB}">If outcomes were still pending</div><div style="font-size:13px">Drop ④, rescale the rest (÷0.80): <span style="font-family:ui-monospace,monospace;font-size:12.5px">0.375·60 + 0.3125·55 + 0.3125·50 = 55.3 → 55</span> — same ballpark, shown with <b>lower confidence</b>. We never invent an outcome score.</div></div></div>
 
   <div style="${PANEL};margin-bottom:12px"><div style="${EB}">Provenance — what is standard, what is ours</div>
    <div style="overflow-x:auto"><table style="border-collapse:collapse;width:100%;min-width:520px;font-size:13.5px">
@@ -346,9 +346,9 @@ function pMethod(){
     <tbody>
      <tr><td style="${TD}">Public records (FDA notices, dockets, SEC)</td><td style="${TD}">${tagObj}</td><td style="${TD}">Primary sources, cited per drug</td></tr>
      <tr><td style="${TD}">FAERS “serious” categories</td><td style="${TD}">${tagStd}</td><td style="${TD}">FDA / ICH definitions</td></tr>
-     <tr><td style="${TD}">Disproportionality metrics (PRR, ROR, IC, EBGM)</td><td style="${TD}">${tagStd}</td><td style="${TD}">FDA, WHO-UMC, EMA — planned basis for AE axis</td></tr>
+     <tr><td style="${TD}">AE axis = ROR of serious outcomes</td><td style="${TD}">${tagStd}</td><td style="${TD}">EMA / MHRA signal metric, from openFDA FAERS with 95% CI</td></tr>
      <tr><td style="${TD}">Four-factor composite + weights (30/25/25/20)</td><td style="${TD}">${tagOurs}</td><td style="${TD}">Editorial design, versioned</td></tr>
-     <tr><td style="${TD}">AE weighting (1.0/0.9/0.8/0.5/0.4) &amp; band cut-offs</td><td style="${TD}">${tagOurs}</td><td style="${TD}">Editorial judgement, versioned</td></tr>
+     <tr><td style="${TD}">ROR→0–100 mapping &amp; band cut-offs</td><td style="${TD}">${tagOurs}</td><td style="${TD}">Editorial judgement, versioned</td></tr>
     </tbody></table></div></div>
 
   <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:12px">

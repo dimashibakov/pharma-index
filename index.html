@@ -50,6 +50,7 @@ kbd{font-family:inherit}
 /* ============ config ============ */
 const SB_URL="https://pbzkpsrmsvapyjbdatdr.supabase.co";
 const SB_KEY="sb_publishable_WdaqO2t-ee-mva7Yegl9ew_do06lVfA";
+const BF="1idRoOY8qWVlN_apojx";
 
 /* ============ tokens / helpers ============ */
 const TIER={Low:['#16794a','#e7f5ee','#bfe5cf','#4fb985'],Moderate:['#2f3fbf','#eef0fb','#cfd5f6','#6f84e6'],Elevated:['#8a5a00','#faf1de','#efd59c','#d9a23c'],High:['#b42318','#fdecea','#f6c9c5','#e5534b'],None:['#4a4b55','#f1f0f5','#dedde6','#b9b8c4']};
@@ -89,7 +90,7 @@ function logoHTML(domain,name,size){const s=size||40;
  const mono=(name||'?').replace(/[^A-Za-z0-9 ]/g,'').split(/\s+/).filter(Boolean).slice(0,2).map(w=>w[0]).join('').toUpperCase();
  const monoStyle=`width:${s}px;height:${s}px;border-radius:9px;background:#eef0fb;color:#3b63b8;place-items:center;font-size:${Math.round(s*0.36)}px;font-weight:600;flex:none`;
  const monoSpan=`<span style="${monoStyle};display:${domain?'none':'grid'}">${mono}</span>`;
- const img=domain?`<img src="https://logo.clearbit.com/${esc(domain)}" alt="${esc(name)}" style="width:${s}px;height:${s}px;border-radius:9px;object-fit:contain;background:#fff;border:1px solid rgba(17,17,20,.08);flex:none" onerror="this.style.display='none';this.nextElementSibling.style.display='grid'">`:'';
+ const img=domain?`<img src="https://cdn.brandfetch.io/domain/${esc(domain)}/w/${s*2}/h/${s*2}?c=${BF}" alt="${esc(name)}" style="width:${s}px;height:${s}px;border-radius:9px;object-fit:contain;background:#fff;border:1px solid rgba(17,17,20,.08);flex:none" onerror="this.style.display='none';this.nextElementSibling.style.display='grid'">`:'';
  return `<span style="display:inline-flex;flex:none">${img}${monoSpan}</span>`;}
 
 /* ============ data load + assembly ============ */

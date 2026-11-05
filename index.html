@@ -286,13 +286,76 @@ function pSource(slug){
 }
 function pMethod(){
  const m=c=>SOURCES.filter(x=>x.cat===c).map(x=>`<a href="#source-${x.s}" style="${CHIP}">${esc(x.nm)}</a>`).join("");
- return `<div style="font-size:13px;color:#8a8a93;margin-bottom:8px">Methodology</div><h1 style="font-size:clamp(30px,3.6vw,44px);line-height:1.05;font-weight:500;margin:0 0 24px;letter-spacing:-0.03em">How the index is computed</h1>
-  <p style="font-size:clamp(19px,2vw,24px);line-height:1.35;letter-spacing:-0.015em;color:#33353c;margin:0 0 24px;max-width:46ch;text-wrap:pretty">Over 95% of pharma suits settle with no admission of liability, and case counts track sales volume more than danger. So the index is not “minus points per loss” but a weighted composite of independent signals; outcomes move the score only once cases actually resolve.</p>
-  <div style="font-size:12.5px;background:#fafafb;border:1px solid rgba(17,17,20,.08);border-radius:14px;padding:13px 15px;line-height:1.7;color:#33353c;overflow-x:auto">Index = Σ ( componentScore × weight ) over components with data<br>regulatory 30% · litigation-volume 25% · AE-severity 25% · outcomes 20%<br>outcomes pending → weight redistributed, confidence lowered</div>
-  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:12px;margin-top:14px">
+ const EB="font-size:13px;color:#8a8a93;margin-bottom:8px";
+ const BOX="background:#fafafb;border:1px solid rgba(17,17,20,.08);border-radius:12px;padding:16px 18px";
+ const WARN="background:#faf1de;border:1px solid #efd59c;color:#8a5a00;border-radius:14px;padding:14px 16px;font-size:13px";
+ const TD="text-align:left;padding:11px 12px;border-bottom:1px solid rgba(17,17,20,.08);vertical-align:top";
+ const TH="text-align:left;padding:11px 12px;border-bottom:1px solid rgba(17,17,20,.08);background:#fafafb;color:#6b6d75;font-weight:500";
+ const tagStd='<span style="font-size:12px;border-radius:6px;padding:2px 8px;background:#e7f5ee;border:1px solid #bfe5cf;color:#16794a">standard</span>';
+ const tagObj='<span style="font-size:12px;border-radius:6px;padding:2px 8px;background:#e7f5ee;border:1px solid #bfe5cf;color:#16794a">objective</span>';
+ const tagOurs='<span style="font-size:12px;border-radius:6px;padding:2px 8px;background:#eef0fb;border:1px solid #cfd5f6;color:#2f3fbf">ours (v1)</span>';
+ const node=(t,s)=>`<div style="flex:1;min-width:128px;background:#fff;border:1px solid rgba(17,17,20,.1);border-radius:12px;padding:12px 14px;font-size:12.5px"><b>${t}</b><div style="color:#6b6d75;margin-top:4px">${s}</div></div>`;
+ const arr='<div style="display:flex;align-items:center;color:#b9b8c4;font-size:20px">→</div>';
+ return `<div style="${EB}">Methodology</div><h1 style="font-size:clamp(30px,3.6vw,44px);line-height:1.05;font-weight:500;margin:0 0 20px;letter-spacing:-0.03em">How the Litigation Signal Index is computed</h1>
+  <p style="font-size:clamp(18px,2vw,22px);line-height:1.4;letter-spacing:-0.015em;color:#33353c;margin:0 0 18px;max-width:62ch;text-wrap:pretty">A transparent, weighted score to navigate a drug's public litigation and regulatory record. It is <b>not</b> a validated measure of clinical risk and not an FDA or WHO rating — it is an editorial composite we build from public data. Here is exactly how, and what is our judgement versus an established standard.</p>
+  <div style="${WARN};margin-bottom:18px"><b>What it is — and isn't.</b> A navigation aid over public records. High means “a lot of legal and regulatory activity worth reading,” not “dangerous”; low is not a safety guarantee. A lawsuit is an allegation, not proof of harm. Not medical or legal advice.</div>
+
+  <div style="${PANEL};margin-bottom:12px"><div style="${EB}">The pipeline at a glance</div><h3 style="${H3}">From public records to one number</h3>
+   <div style="display:flex;gap:10px;flex-wrap:wrap;margin:16px 0 6px">${node('Public records','FDA notices · MDL/court dockets · FAERS · SEC')}${arr}${node('4 component scores','each mapped to 0–100')}${arr}${node('× weight','30 / 25 / 25 / 20')}${arr}${node('Σ = Index','0–100')}${arr}${node('Band','Low · Moderate · Elevated · High')}</div>
+   <p style="color:#6b6d75;font-size:12.5px;margin:12px 0 0">If a component has no data (e.g. outcomes still pending), its weight is removed and the rest are rescaled, and <b>confidence</b> is lowered rather than guessing.</p></div>
+
+  <div style="${PANEL};margin-bottom:12px"><div style="${EB}">The formula</div><div style="${BOX};font-family:ui-monospace,monospace;font-size:13px;line-height:1.8">Index = Σ ( component_score × weight ) ÷ Σ ( weight of components with data )<br>bands:  Low 0–24 ·  Moderate 25–49 ·  Elevated 50–74 ·  High 75–100</div></div>
+
+  <div style="${PANEL};margin-bottom:12px"><div style="${EB}">The four factors</div><h3 style="${H3}">What each measures, where it comes from, and why its weight</h3>
+   <div style="overflow-x:auto"><table style="border-collapse:collapse;width:100%;min-width:620px;font-size:13.5px">
+    <thead><tr><th style="${TH};width:132px">Factor</th><th style="${TH}">Measures</th><th style="${TH}">Source</th><th style="${TH};width:58px">Weight</th><th style="${TH};width:32%">Why this weight</th></tr></thead>
+    <tbody>
+     <tr><td style="${TD}"><b>Regulatory action</b></td><td style="${TD}">Boxed warnings, safety communications, label changes, recalls, withdrawals</td><td style="${TD}">FDA/openFDA, Federal Register, MHRA, EMA</td><td style="${TD};color:#3b63b8;font-weight:500">30%</td><td style="${TD}">A regulator acting is the strongest external, adjudicated signal — the closest thing to an authority's verdict.</td></tr>
+     <tr><td style="${TD}"><b>Litigation volume</b></td><td style="${TD}">Number/size of filings and MDLs, normalized by exposure</td><td style="${TD}">CourtListener/RECAP, JPML, PACER</td><td style="${TD};color:#3b63b8;font-weight:500">25%</td><td style="${TD}">Breadth of claims — but raw counts track sales and solicitation, so it is exposure-normalized and capped.</td></tr>
+     <tr><td style="${TD}"><b>AE severity</b></td><td style="${TD}">How serious reported adverse events are</td><td style="${TD}">openFDA FAERS</td><td style="${TD};color:#3b63b8;font-weight:500">25%</td><td style="${TD}">Real-world seriousness — but spontaneous reporting is biased, so it cannot dominate.</td></tr>
+     <tr><td style="${TD}"><b>Court outcomes</b></td><td style="${TD}">Verdicts, dismissals, settlements once resolved</td><td style="${TD}">Court dockets, SEC filings</td><td style="${TD};color:#3b63b8;font-weight:500">20%</td><td style="${TD}">Most meaningful when resolved — but &gt;95% settle with no admission and many stay pending, so lowest and dropped while pending.</td></tr>
+    </tbody></table></div>
+   <p style="color:#6b6d75;font-size:12.5px;margin:12px 0 0"><b>On the weights:</b> 30/25/25/20 is our editorial judgement (v1), not a figure from a study. We publish and version it — this is the part that is a choice, not a standard.</p></div>
+
+  <div style="${PANEL};margin-bottom:12px"><div style="${EB}">Inside the AE-severity factor</div><h3 style="${H3}">How “severity” becomes a number</h3>
+   <p style="font-size:14px;color:#33353c;margin:0 0 10px">We query openFDA FAERS for total reports and how many carry each <b>serious</b> outcome. The definition of “serious” is the regulator's; the weighting of them is ours:</p>
+   <div style="${BOX};font-family:ui-monospace,monospace;font-size:12.5px;line-height:1.8;margin-bottom:12px">severity_rate = ( 1.0·death + 0.9·congenital + 0.8·life-threatening + 0.5·disabling + 0.4·hospitalization ) ÷ total_reports<br>AE_score = round( severity_rate × 100 ), capped 0–100</div>
+   <p style="font-size:13px;color:#6b6d75;margin:0 0 12px">Drugs with fewer than 50 reports are left marked EST rather than scored on noise.</p>
+   <div style="${WARN}"><b>Where recognised standards sit.</b> FDA, WHO and EMA publish no single “danger score” per drug. They use disproportionality methods for one drug–event pair at a time — PRR, ROR, IC/BCPNN (WHO Uppsala), EBGM/MGPS (FDA). Our planned next step re-bases this factor on one of those (likely ROR or EBGM) so the pharmacovigilance axis rests on a citable standard.</div></div>
+
+  <div style="${PANEL};margin-bottom:12px;border-color:#cfd5f6"><div style="${EB};color:#2f3fbf">Worked example · fictional</div><h3 style="${H3}">Veltraxa (velcarbide) — Caldwell Therapeutics</h3>
+   <p style="font-size:13px;color:#6b6d75;margin:0 0 14px">A made-up drug and company, only to show the arithmetic.</p>
+   <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr));gap:10px;margin-bottom:14px">
+    <div style="${BOX}"><div style="${EB}">① Regulatory</div><div style="font-size:13px">1 FDA safety comm. (2025) + label warning; no boxed warning. <b>→ 60</b></div></div>
+    <div style="${BOX}"><div style="${EB}">② Litigation volume</div><div style="font-size:13px">MDL, ~1,200 cases; normalized to ≈2M patient-years. <b>→ 55</b></div></div>
+    <div style="${BOX}"><div style="${EB}">③ AE severity (FAERS)</div><div style="font-size:13px">12,400 reports · 10% death · 40% hosp · … <span style="font-family:ui-monospace,monospace;font-size:12px">→ .367</span> <b>→ 37</b></div></div>
+    <div style="${BOX}"><div style="${EB}">④ Court outcomes</div><div style="font-size:13px">2 bellwethers (1 plaintiff, 1 defense); no global settlement. <b>→ 50</b></div></div>
+   </div>
+   <div style="${BOX};font-size:13px;font-family:ui-monospace,monospace;line-height:1.9">
+    <div style="display:flex;justify-content:space-between;color:#6b6d75"><span>Regulatory 60 × 0.30</span><span>= 18.00</span></div>
+    <div style="display:flex;justify-content:space-between;color:#6b6d75"><span>Litigation 55 × 0.25</span><span>= 13.75</span></div>
+    <div style="display:flex;justify-content:space-between;color:#6b6d75"><span>AE severity 37 × 0.25</span><span>= 9.25</span></div>
+    <div style="display:flex;justify-content:space-between;color:#6b6d75"><span>Outcomes 50 × 0.20</span><span>= 10.00</span></div>
+    <div style="display:flex;justify-content:space-between;border-top:1px solid rgba(17,17,20,.15);margin-top:6px;padding-top:6px;font-weight:600"><span>Index = Σ</span><span>51.0</span></div></div>
+   <div style="display:flex;align-items:center;gap:12px;margin-top:12px"><span style="font-size:32px;font-weight:500;letter-spacing:-0.03em;font-variant-numeric:tabular-nums">51</span><span style="font-size:13.5px;color:#d9a23c;border:1px solid #efd59c;background:#faf1de;border-radius:999px;padding:4px 12px">Elevated (50–74)</span></div>
+   <div style="${BOX};border-style:dashed;margin-top:14px"><div style="${EB}">If outcomes were still pending</div><div style="font-size:13px">Drop ④, rescale the rest (÷0.80): <span style="font-family:ui-monospace,monospace;font-size:12.5px">0.375·60 + 0.3125·55 + 0.3125·37 = 51.25 → 51</span> — same ballpark, shown with <b>lower confidence</b>. We never invent an outcome score.</div></div></div>
+
+  <div style="${PANEL};margin-bottom:12px"><div style="${EB}">Provenance — what is standard, what is ours</div>
+   <div style="overflow-x:auto"><table style="border-collapse:collapse;width:100%;min-width:520px;font-size:13.5px">
+    <thead><tr><th style="${TH}">Element</th><th style="${TH};width:140px">Status</th><th style="${TH}">Basis</th></tr></thead>
+    <tbody>
+     <tr><td style="${TD}">Public records (FDA notices, dockets, SEC)</td><td style="${TD}">${tagObj}</td><td style="${TD}">Primary sources, cited per drug</td></tr>
+     <tr><td style="${TD}">FAERS “serious” categories</td><td style="${TD}">${tagStd}</td><td style="${TD}">FDA / ICH definitions</td></tr>
+     <tr><td style="${TD}">Disproportionality metrics (PRR, ROR, IC, EBGM)</td><td style="${TD}">${tagStd}</td><td style="${TD}">FDA, WHO-UMC, EMA — planned basis for AE axis</td></tr>
+     <tr><td style="${TD}">Four-factor composite + weights (30/25/25/20)</td><td style="${TD}">${tagOurs}</td><td style="${TD}">Editorial design, versioned</td></tr>
+     <tr><td style="${TD}">AE weighting (1.0/0.9/0.8/0.5/0.4) &amp; band cut-offs</td><td style="${TD}">${tagOurs}</td><td style="${TD}">Editorial judgement, versioned</td></tr>
+    </tbody></table></div></div>
+
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:12px">
    <div style="${PANEL}"><h3 style="${H3}">Sources — legal</h3><div style="display:flex;flex-wrap:wrap;gap:7px">${m('legal')}</div></div>
    <div style="${PANEL}"><h3 style="${H3}">Sources — medical</h3><div style="display:flex;flex-wrap:wrap;gap:7px">${m('medical')}</div></div></div>
-  <div style="background:#faf1de;border:1px solid #efd59c;border-radius:16px;padding:14px 16px;margin-top:20px"><p style="margin:0;font-size:12.5px;color:#8a5a00"><b>Not medical or legal advice.</b> A public-records aggregator. A lawsuit is an allegation, not proof of harm. AE severity is computed from openFDA FAERS seriousness data; a few withdrawn drugs with sparse recent reports stay estimated (marked EST). Do not change a prescription based on this page — talk to your prescriber.</p></div>`;
+
+  <div style="${WARN};margin-top:16px"><b>Not medical or legal advice.</b> A public-records aggregator and navigation aid; a lawsuit is an allegation, not proof of harm. AE severity comes from openFDA FAERS (withdrawn drugs with sparse reports stay EST). Do not start, stop or change any medication based on this page — talk to your prescriber.</div>`;
 }
 
 /* ============ palette ============ */

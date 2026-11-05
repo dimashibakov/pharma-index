@@ -73,23 +73,49 @@ function drugCard(d){return `<a href="#drug-${d.s}" style="display:block;border:
   <div style="font-size:11.5px;color:#8a8a93;margin-top:2px">${esc(d.ty)} · ${esc(d.mf)}</div>
   <div style="display:flex;flex-direction:column;align-items:flex-start;gap:4px;margin-top:14px">${gauge(d.bd,d.ix,72,44,19)}<span style="font-size:12.5px;color:${TIER[d.bd][0]};width:72px;text-align:center">${d.bd}</span></div></a>`;}
 
+/* images: resolved client-side from a Wikipedia article title (no stored URLs) */
+const imgCache={};
+function hydrateImages(){
+ document.querySelectorAll('[data-wiki]').forEach(el=>{
+  if(el.dataset.done)return; el.dataset.done='1';
+  const t=el.getAttribute('data-wiki'); if(!t)return;
+  const set=u=>{if(u){el.style.backgroundImage='url("'+u+'")';el.style.backgroundSize='contain';el.style.backgroundRepeat='no-repeat';el.style.backgroundPosition='center';el.textContent='';}};
+  if(imgCache[t]!==undefined){set(imgCache[t]);return;}
+  fetch('https://en.wikipedia.org/api/rest_v1/page/summary/'+encodeURIComponent(t))
+   .then(r=>r.ok?r.json():null)
+   .then(j=>{const u=j&&j.thumbnail&&j.thumbnail.source;imgCache[t]=u||null;set(u);})
+   .catch(()=>{imgCache[t]=null;});
+ });
+}
+/* company logo via Clearbit by domain, with a monogram fallback */
+function logoHTML(domain,name,size){const s=size||40;
+ const mono=(name||'?').replace(/[^A-Za-z0-9 ]/g,'').split(/\s+/).filter(Boolean).slice(0,2).map(w=>w[0]).join('').toUpperCase();
+ const monoStyle=`width:${s}px;height:${s}px;border-radius:9px;background:#eef0fb;color:#3b63b8;place-items:center;font-size:${Math.round(s*0.36)}px;font-weight:600;flex:none`;
+ const monoSpan=`<span style="${monoStyle};display:${domain?'none':'grid'}">${mono}</span>`;
+ const img=domain?`<img src="https://logo.clearbit.com/${esc(domain)}" alt="${esc(name)}" style="width:${s}px;height:${s}px;border-radius:9px;object-fit:contain;background:#fff;border:1px solid rgba(17,17,20,.08);flex:none" onerror="this.style.display='none';this.nextElementSibling.style.display='grid'">`:'';
+ return `<span style="display:inline-flex;flex:none">${img}${monoSpan}</span>`;
+}
+
 /* ============ data load + assembly ============ */
 let DRUGS=[], MANS={}, MDLS={}, SOURCES=[], DBYID={};
 async function loadData(){
  const H={apikey:SB_KEY,Authorization:'Bearer '+SB_KEY};
  const get=t=>fetch(SB_URL+'/rest/v1/'+t,{headers:H}).then(r=>{if(!r.ok)throw new Error(t.split('?')[0]+' '+r.status);return r.json();});
- const [drugs,comps,lits,mans,dm,ld,srcs]=await Promise.all([
-  get('drugs?select=id,slug,name,brands,drug_type,manufacturer,manufacturer_primary,status,signal_index,band,confidence,fda_summary,boxed_warning&order=signal_index.desc'),
+ const [drugs,comps,lits,mans,dm,ld,srcs,mkt,hist]=await Promise.all([
+  get('drugs?select=id,slug,name,brands,drug_type,manufacturer,manufacturer_primary,status,signal_index,band,confidence,fda_summary,boxed_warning,description,image_url,wiki_title&order=signal_index.desc'),
   get('signal_components?select=drug_id,position,name,weight,score,value,is_estimated&order=drug_id,position'),
   get('litigation?select=id,drug_id,docket,court,injuries,pending,status,is_excluded&order=id'),
-  get('manufacturers?select=id,slug,name,status,org_type,note'),
+  get('manufacturers?select=id,slug,name,status,org_type,note,description,website,hq,founded,logo_url'),
   get('drug_manufacturers?select=drug_id,manufacturer_id,role,valid_from,valid_to'),
   get('litigation_defendants?select=litigation_id,manufacturer_id,defendant_name,note'),
-  get('data_sources?select=name,category,access,notes,coverage')
+  get('data_sources?select=name,category,access,notes,coverage'),
+  get('drug_market_names?select=drug_id,country,brand_name,note&order=id'),
+  get('risk_scores?select=drug_id,version,signal_index,band,created_at&order=drug_id,version')
  ]);
  const manById=Object.fromEntries(mans.map(m=>[m.id,m]));
+ const manBySlug=Object.fromEntries(mans.map(m=>[m.slug,m]));
  const by=(arr,k)=>{const o={};arr.forEach(x=>(o[x[k]]=o[x[k]]||[]).push(x));return o;};
- const compBy=by(comps,'drug_id'), litBy=by(lits,'drug_id'), dmBy=by(dm,'drug_id'), ldBy=by(ld,'litigation_id');
+ const compBy=by(comps,'drug_id'), litBy=by(lits,'drug_id'), dmBy=by(dm,'drug_id'), ldBy=by(ld,'litigation_id'), mktBy=by(mkt,'drug_id'), histBy=by(hist,'drug_id');
  DRUGS=drugs.map(r=>{
    const cs=(compBy[r.id]||[]).slice().sort((a,b)=>a.position-b.position);
    const g=(i,f)=>cs[i]?cs[i][f]:null;
@@ -102,11 +128,11 @@ async function loadData(){
    const mfs=curMan?curMan.slug:slugify(mf);
    const former=dms.filter(x=>x.role==='former_manufacturer'||x.role==='originator').map(x=>({name:(manById[x.manufacturer_id]||{}).name||'—',to:x.valid_to}));
    const defs=[]; myl.forEach(l=>(ldBy[l.id]||[]).forEach(x=>{const nm=x.manufacturer_id?(manById[x.manufacturer_id]||{}).name:x.defendant_name;if(nm&&!defs.includes(nm))defs.push(nm);}));
-   return {id:r.id,s:r.slug,nm:r.name,br:r.brands,ty:r.drug_type,mf,mfs,ix:r.signal_index,bd:r.band,st:r.status,conf:r.confidence,fda:r.fda_summary,boxed:r.boxed_warning,cp,mdl,former,defs,curType:curMan?curMan.org_type:null,curNote:curMan?curMan.note:null};
+   return {id:r.id,s:r.slug,nm:r.name,br:r.brands,ty:r.drug_type,mf,mfs,ix:r.signal_index,bd:r.band,st:r.status,conf:r.confidence,fda:r.fda_summary,boxed:r.boxed_warning,cp,mdl,former,defs,curType:curMan?curMan.org_type:null,curNote:curMan?curMan.note:null,desc:r.description,wiki:r.wiki_title,img:r.image_url,mkt:(mktBy[r.id]||[]),hist:(histBy[r.id]||[])};
  });
  DBYID=Object.fromEntries(DRUGS.map(d=>[d.id,d]));
  MANS={}; DRUGS.forEach(d=>{(MANS[d.mfs]=MANS[d.mfs]||{slug:d.mfs,name:d.mf,drugs:[]}).drugs.push(d);});
- Object.values(MANS).forEach(m=>m.avg=Math.round(m.drugs.reduce((a,d)=>a+d.ix,0)/m.drugs.length));
+ Object.values(MANS).forEach(m=>{m.avg=Math.round(m.drugs.reduce((a,d)=>a+d.ix,0)/m.drugs.length);const meta=manBySlug[m.slug]||{};m.desc=meta.description;m.site=meta.website;m.hq=meta.hq;m.founded=meta.founded;m.logo=meta.logo_url;});
  MDLS={}; lits.forEach(l=>{const id=((l.docket||'').match(/\d{3,4}/)||[''])[0]; if(id&&!l.is_excluded){const M=MDLS[id]=MDLS[id]||{id,docket:l.docket,court:l.court,inj:l.injuries,st:l.status,pend:l.pending,drugs:[]}; const dd=DBYID[l.drug_id]; if(dd&&!M.drugs.includes(dd))M.drugs.push(dd);}});
  SOURCES=srcs.map(x=>({s:slugify(x.name),nm:x.name,cat:x.category,acc:x.access,note:x.notes||x.coverage||''}));
 }
@@ -184,7 +210,11 @@ function pDrug(slug){
  const parts=[[d.cp[0],d.cp[1],false],[d.cp[2],d.cp[3],false],[d.cp[4],d.cp[5],d.cp[6]===1],[d.cp[7],d.cp[8],false]];
  const comps=parts.map((pt,i)=>{const pend=pt[0]===null||pt[0]===undefined;const fill=pend?'repeating-linear-gradient(45deg,#b9b8c4,#b9b8c4 5px,transparent 5px,transparent 10px)':TIER[bandOf(pt[0])][3];
    return `<div style="margin-bottom:11px"><div style="display:flex;justify-content:space-between;gap:10px;font-size:13px;margin-bottom:4px;flex-wrap:wrap"><span>${names[i]} <span style="color:#8a8a93;font-size:11px">· ${w[i]}</span></span><span style="color:#6b6d75;font-size:12px">${esc(pt[1])}${pt[2]?'<span style="font-size:11px;color:#8a5a00;background:#faf1de;border:1px solid #efd59c;border-radius:4px;padding:1px 6px;margin-left:5px;vertical-align:middle">EST</span>':''} · ${pend?'—':pt[0]}</span></div><div style="height:7px;background:#ecebf1;border-radius:99px;overflow:hidden"><div style="height:100%;width:${pend?'100%':pt[0]+'%'};background:${fill};border-radius:99px"></div></div></div>`;}).join("");
- const hist=[[d.ix-6,'Jul'],[d.ix-3,'Sep'],[d.ix,'Nov']],hmax=Math.max(...hist.map(h=>h[0]),1);
+ const hv=(d.hist||[]).slice().sort((a,b)=>a.version-b.version); const hmax=Math.max(...hv.map(h=>h.signal_index),1);
+ const fmtV=ds=>{try{return new Date(ds).toLocaleDateString('en-US',{month:'short',year:'numeric'});}catch(e){return '';}};
+ const histHTML=hv.length?`<div style="display:flex;gap:7px;align-items:flex-end;height:76px;padding-top:16px">${hv.map(h=>`<div title="v${h.version} · ${h.signal_index}" style="flex:1;min-width:26px;height:${Math.round(h.signal_index/hmax*100)}%;min-height:22px;background:#eef0fb;border:1px solid rgba(17,17,20,.12);border-radius:4px 4px 0 0;position:relative;display:flex;align-items:flex-end;justify-content:center"><span style="position:absolute;top:-17px;font-size:10px;color:#8a8a93">v${h.version}</span><b style="font-size:10px;color:#33353c;padding-bottom:3px">${h.signal_index}</b></div>`).join("")}</div><p style="font-size:11.5px;color:#8a8a93;margin:10px 0 0">${hv.length===1?('Baseline version · '+fmtV(hv[0].created_at)+'. Each data update writes a new version.'):'Each data update writes a new index version.'}</p>`:'<p style="font-size:12px;color:#8a8a93;margin:10px 0 0">No version history yet.</p>';
+ const marketHTML=(d.mkt&&d.mkt.length)?`<div style="margin-top:14px"><div style="font-size:12px;color:#8a8a93;margin-bottom:6px">Sold as</div><div style="display:flex;flex-wrap:wrap;gap:6px">${d.mkt.map(m=>`<span style="font-size:12.5px;border:1px solid rgba(17,17,20,.1);border-radius:8px;padding:4px 10px"><b>${esc(m.brand_name)}</b> <span style="color:#8a8a93">· ${esc(m.country)}</span></span>`).join("")}</div></div>`:'';
+ const aboutHTML=(d.desc||d.wiki)?`<div style="${PANEL};margin-bottom:12px;display:flex;gap:20px;align-items:flex-start;flex-wrap:wrap"><div data-wiki="${esc(d.wiki||'')}" style="width:116px;height:116px;border-radius:12px;background:#fafafb;border:1px solid rgba(17,17,20,.08);flex:none;display:grid;place-items:center;color:#c4c3cc;font-size:10px">image</div><div style="flex:1;min-width:220px"><h3 style="${H3}">About this drug</h3><p style="margin:0;font-size:14px;color:#33353c;line-height:1.55">${esc(d.desc||'—')}</p>${marketHTML}</div></div>`:'';
  const strong=d.cp[0]>=80;
  const box=d.cp[0]>=65?`<div style="border:1px solid ${strong?'#f6c9c5':'#efd59c'};background:${strong?'#fdecea':'#faf1de'};border-radius:12px;padding:16px 18px;margin-bottom:12px"><div style="font-size:14px;font-weight:500;color:${strong?'#b42318':'#8a5a00'}">${esc((d.fda||'').split('.')[0].split(';')[0])}</div><p style="margin:6px 0 0;font-size:13px;color:#33353c">${esc(d.fda)}</p></div>`:'';
  const related=DRUGS.filter(x=>x.ty===d.ty&&x.s!==d.s).concat(DRUGS.filter(x=>x.mf===d.mf&&x.s!==d.s)).filter((x,i,a)=>a.indexOf(x)===i).slice(0,5);
@@ -207,6 +237,7 @@ function pDrug(slug){
    <div style="border:1px solid rgba(17,17,20,.08);border-radius:20px;padding:22px 28px;text-align:center;min-width:200px;background:#fff;box-shadow:0 30px 60px -40px rgba(17,17,20,.25)">
     <div style="font-size:13px;color:#8a8a93;margin-bottom:8px">Signal index</div>
     <div style="display:flex;flex-direction:column;align-items:center;gap:6px">${gauge(d.bd,d.ix,200,120,56)}<span style="font-size:15px;color:${TIER[d.bd][0]}">${d.bd}</span></div></div></div>
+  ${aboutHTML}
   <div style="${PANEL};margin-bottom:12px"><h3 style="${H3}">Signal components</h3>${comps}<p style="font-size:11.5px;color:#8a8a93;margin:6px 0 0"><b>Confidence:</b> ${esc(d.conf)}. Not a safety rating or verdict.</p></div>
   ${succ}
   <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:12px">
@@ -217,10 +248,9 @@ function pDrug(slug){
     <div style="display:flex;gap:12px;padding:9px 0;border-top:1px solid rgba(17,17,20,.08);font-size:13px"><span style="flex:0 0 120px;color:#6b6d75;font-size:12.5px">Outcome</span><span>${esc(d.cp[8])}</span></div></div>
    <div style="${PANEL};margin-bottom:12px"><h3 style="${H3}">FDA / regulatory</h3>${box}<div style="display:flex;gap:12px;padding:9px 0;font-size:13px"><span style="flex:0 0 120px;color:#6b6d75;font-size:12.5px">Summary</span><span>${esc(d.fda)}</span></div></div></div>
   <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:12px">
-   <div style="${PANEL};margin-bottom:12px"><h3 style="${H3}">Score history (versions)</h3><div style="display:flex;gap:7px;align-items:flex-end;height:76px;padding-top:16px">${hist.map(h=>`<div style="flex:1;height:${Math.round(h[0]/hmax*100)}%;min-height:22px;background:#eef0fb;border:1px solid rgba(17,17,20,.12);border-radius:4px 4px 0 0;position:relative;display:flex;align-items:flex-end;justify-content:center"><span style="position:absolute;top:-17px;font-size:10px;color:#8a8a93">${h[1]}</span><b style="font-size:10px;color:#33353c;padding-bottom:3px">${h[0]}</b></div>`).join("")}</div><p style="font-size:11.5px;color:#8a8a93;margin:10px 0 0">Each data update writes a new index version.</p></div>
-   <div style="${PANEL};margin-bottom:12px"><h3 style="${H3}">Public API</h3><div style="color:#6b6d75;background:#fafafb;border:1px solid rgba(17,17,20,.08);border-radius:12px;padding:14px 16px;overflow-x:auto;white-space:pre;font-size:13px;line-height:1.6"><span style="color:#3b63b8">GET</span> /api/v1/drug/${esc(d.s)}
-{ "index": ${d.ix}, "band": "${esc(d.bd)}",
-  "status": "${esc(d.st)}" }</div><div style="margin-top:9px;display:flex;gap:8px"><button style="${CHIP}">JSON</button><button style="${CHIP}">CSV</button></div></div></div>
+   <div style="${PANEL};margin-bottom:12px"><h3 style="${H3}">Score history (versions)</h3>${histHTML}</div>
+   <div style="${PANEL};margin-bottom:12px"><h3 style="${H3}">Public API</h3><div style="color:#6b6d75;background:#fafafb;border:1px solid rgba(17,17,20,.08);border-radius:12px;padding:14px 16px;overflow-x:auto;white-space:pre;font-size:13px;line-height:1.6"><span style="color:#3b63b8">GET</span> /rest/v1/v_public_drug?slug=eq.${esc(d.s)}
+<span style="color:#8a8a93">Host:</span> pbzkpsrmsvapyjbdatdr.supabase.co</div><div style="margin-top:9px;display:flex;gap:8px"><a href="${SB_URL}/rest/v1/v_public_drug?slug=eq.${esc(d.s)}&apikey=${SB_KEY}" target="_blank" rel="noopener" style="${CHIP};color:#3b63b8">Open JSON ↗</a></div><p style="font-size:11px;color:#8a8a93;margin:8px 0 0">Public read-only endpoint (anon key).</p></div></div>
   <div style="${PANEL};margin-bottom:12px"><h3 style="${H3}">Related</h3><div style="display:flex;flex-wrap:wrap;gap:7px">${related.map(r=>`<a href="#drug-${r.s}" style="${CHIP}">${esc(r.br)} · ${r.ix}</a>`).join("")}<a href="#mfr-${d.mfs}" style="${CHIP};color:#3b63b8">all “${esc(d.mf)}” →</a></div></div>
   <div style="${PANEL}"><h3 style="${H3}">Sources (public records)</h3><div style="display:flex;flex-wrap:wrap;gap:7px">${srcChips}</div></div>`;
 }
@@ -232,8 +262,9 @@ function pGroup(route){
    const avg=m.avg, bd=bandOf(avg);
    return `<div style="font-size:12px;color:#8a8a93;margin-bottom:14px;display:flex;gap:6px;flex-wrap:wrap"><a href="#browse" style="color:#3b63b8">Browse</a><span>/</span><span>Manufacturer</span><span>/</span><span>${esc(m.name)}</span></div>
     <div style="display:flex;flex-wrap:wrap;gap:16px;justify-content:space-between;align-items:flex-start;margin-bottom:16px">
-     <div><h1 style="margin:0;font-size:clamp(44px,6vw,80px);line-height:1;font-weight:500;letter-spacing:-0.035em">${esc(m.name)}</h1><div style="color:#111114;font-size:clamp(19px,2vw,26px);line-height:1.3;letter-spacing:-0.015em;margin-top:18px">Manufacturer · ${m.drugs.length} drugs in the database</div></div>
+     <div style="display:flex;gap:16px;align-items:flex-start;min-width:0">${logoHTML(m.site,m.name,56)}<div style="min-width:0"><h1 style="margin:0;font-size:clamp(44px,6vw,80px);line-height:1;font-weight:500;letter-spacing:-0.035em">${esc(m.name)}</h1><div style="color:#111114;font-size:clamp(19px,2vw,26px);line-height:1.3;letter-spacing:-0.015em;margin-top:18px">Manufacturer · ${m.drugs.length} drugs${m.hq?' · '+esc(m.hq):''}${m.founded?' · est. '+esc(m.founded):''}</div>${m.site?`<a href="https://${esc(m.site)}" target="_blank" rel="noopener" style="${CHIP};color:#3b63b8;margin-top:12px;display:inline-block">${esc(m.site)} ↗</a>`:''}</div></div>
      <div style="border:1px solid rgba(17,17,20,.08);border-radius:20px;padding:22px 28px;text-align:center;min-width:200px;background:#fff;box-shadow:0 30px 60px -40px rgba(17,17,20,.25)"><div style="font-size:13px;color:#8a8a93;margin-bottom:8px">Avg index</div><div style="display:flex;flex-direction:column;align-items:center;gap:6px">${gauge(bd,avg,160,96,44)}<span style="font-size:14px;color:${TIER[bd][0]}">${bd}</span></div><div style="font-size:11.5px;color:#6b6d75;margin-top:6px">across ${m.drugs.length} drugs</div></div></div>
+    ${m.desc?`<div style="${PANEL};margin-bottom:12px"><p style="margin:0;font-size:14px;color:#33353c;line-height:1.55">${esc(m.desc)}</p></div>`:''}
     <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:11px">${[...m.drugs].sort((a,b)=>b.ix-a.ix).map(drugCard).join("")}</div>`;
  } else {
    const id=route.slice(4), m=MDLS[id];
@@ -314,6 +345,7 @@ function route(){
  const nav=[['Browse','browse'],['Explore','explore'],['Methodology','methodology']];
  document.getElementById('nav').innerHTML=nav.map(([l,r])=>`<a href="#${r}" style="font-size:15px;color:${page===r?'#3b63b8':'#111114'};background:${page===r?'#eef0fb':'transparent'};padding:8px 14px;border-radius:999px;white-space:nowrap">${l}</a>`).join("");
  const hs=document.getElementById('heroSearch'); if(hs)hs.addEventListener('click',()=>openPal());
+ hydrateImages();
  window.scrollTo(0,0);
 }
 

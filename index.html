@@ -255,9 +255,6 @@ function pProduct(slug){
    <div style="${PANEL};margin-bottom:12px"><h3 style="${H3}">FDA / regulatory</h3>${g.boxed?`<div style="border:1px solid #efd59c;background:#faf1de;border-radius:12px;padding:12px 14px;margin-bottom:10px;font-size:13px;color:#8a5a00"><b>Boxed/﻿key warning:</b> ${esc(g.boxed)}</div>`:''}<p style="margin:0;font-size:13px;color:#33353c">${esc(g.fda||'—')}</p></div>
    <div style="${PANEL};margin-bottom:12px"><h3 style="${H3}">Score history (versions)</h3>${histHTML}</div></div>
 
-  <div style="${PANEL};margin-bottom:12px"><h3 style="${H3}">Public API</h3><div style="color:#6b6d75;background:#fafafb;border:1px solid rgba(17,17,20,.08);border-radius:12px;padding:14px 16px;overflow-x:auto;white-space:pre;font-size:13px;line-height:1.6"><span style="color:#3b63b8">GET</span> /rest/v1/v_public_product?slug=eq.${esc(p.s)}
-<span style="color:#8a8a93">Host:</span> pbzkpsrmsvapyjbdatdr.supabase.co</div><div style="margin-top:9px"><a href="${SB_URL}/rest/v1/v_public_product?slug=eq.${esc(p.s)}&apikey=${SB_KEY}" target="_blank" rel="noopener" style="${CHIP};color:#3b63b8">Open JSON ↗</a></div></div>
-
   <div style="${PANEL}"><h3 style="${H3}">Related</h3>
    ${sibs.length?`<div style="font-size:12.5px;color:#8a8a93;margin-bottom:6px">Same ingredient (${esc(g.inn)})</div><div style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:12px">${sibs.map(x=>`<a href="#product-${x.s}" style="${CHIP}">${esc(x.br)} · ${x.ix==null?'—':x.ix}</a>`).join("")}</div>`:''}
    ${Object.keys(uniqClassIng).length?`<div style="font-size:12.5px;color:#8a8a93;margin-bottom:6px">Same class${cl?' ('+esc(cl.name)+')':''}</div><div style="display:flex;gap:7px;flex-wrap:wrap">${Object.values(uniqClassIng).map(x=>`<a href="#product-${x.s}" style="${CHIP}">${esc(x.br)} · ${esc(x.ing.inn)}</a>`).join("")}</div>`:''}
